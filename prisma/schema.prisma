@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  STUDENT
+  STAFF
+  ADMIN
+}
+
+enum AdmissionStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  role          Role
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  student       Student?
+  staff         Staff?
+  refreshTokens RefreshToken[]
+}
+
+model Student {
+  id         String     @id @default(cuid())
+  userId     String     @unique
+  user       User       @relation(fields: [userId], references: [id])
+  rollNumber String?    @unique
+  programme  String?
+  admission  Admission?
+}
+
+model Staff {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  user        User    @relation(fields: [userId], references: [id])
+  department  String?
+  designation String?
+}
+
+// ponytail: formData is a JSON blob instead of normalized columns because the
+// admissions form fields aren't finalized across ussu-web + portal yet. Upgrade
+// to real columns once the form schema stabilizes and filtering/reporting on
+// specific fields at the DB level is actually needed.
+model Admission {
+  id          String          @id @default(cuid())
+  studentId   String          @unique
+  student     Student         @relation(fields: [studentId], references: [id])
+  status      AdmissionStatus @default(SUBMITTED)
+  formData    Json
+  submittedAt DateTime        @default(now())
+  reviewedAt  DateTime?
+  reviewedBy  String?
+}
+
+model Notice {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  postedBy  String
+  createdAt DateTime @default(now())
+}
+
+// Stores a hash, not the raw refresh token — a raw token in the DB would let
+// anyone with read access to the table impersonate any user.
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  tokenHash String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
