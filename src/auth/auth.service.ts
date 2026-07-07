@@ -51,12 +51,14 @@ export class AuthService {
       },
     });
 
-    const secure = this.config.get<string>("nodeEnv") === "production";
-    res.cookie(ACCESS_COOKIE, accessToken, { httpOnly: true, secure, sameSite: "lax", maxAge: 2 * 60 * 60 * 1000 });
+    const nodeEnv = this.config.get<string>("nodeEnv");
+    const secure = nodeEnv === "production" || nodeEnv === "staging";
+    const sameSite = secure ? "none" : "lax";
+    res.cookie(ACCESS_COOKIE, accessToken, { httpOnly: true, secure, sameSite, maxAge: 2 * 60 * 60 * 1000 });
     res.cookie(REFRESH_COOKIE, refreshToken, {
       httpOnly: true,
       secure,
-      sameSite: "lax",
+      sameSite,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
   }
