@@ -54,13 +54,23 @@ export class AuthService {
     const nodeEnv = this.config.get<string>("nodeEnv");
     const secure = nodeEnv === "production" || nodeEnv === "staging";
     const sameSite = secure ? "none" : "lax";
-    res.cookie(ACCESS_COOKIE, accessToken, { httpOnly: true, secure, sameSite, maxAge: 2 * 60 * 60 * 1000 });
+    const domain = this.config.get<string>("cookieDomain");
+    res.cookie(ACCESS_COOKIE, accessToken, { httpOnly: true, secure, sameSite, domain, maxAge: 2 * 60 * 60 * 1000 });
     res.cookie(REFRESH_COOKIE, refreshToken, {
       httpOnly: true,
       secure,
       sameSite,
+      domain,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+  }
+
+  private cookieClearOptions() {
+    const nodeEnv = this.config.get<string>("nodeEnv");
+    const secure = nodeEnv === "production" || nodeEnv === "staging";
+    const sameSite = secure ? ("none" as const) : ("lax" as const);
+    const domain = this.config.get<string>("cookieDomain");
+    return { httpOnly: true, secure, sameSite, domain };
   }
 
   async login(email: string, password: string, res: Response) {
@@ -80,7 +90,8 @@ export class AuthService {
   }
 
   logout(res: Response) {
-    res.clearCookie(ACCESS_COOKIE);
-    res.clearCookie(REFRESH_COOKIE);
+    const options = this.cookieClearOptions();
+    res.clearCookie(ACCESS_COOKIE, options);
+    res.clearCookie(REFRESH_COOKIE, options);
   }
 }
