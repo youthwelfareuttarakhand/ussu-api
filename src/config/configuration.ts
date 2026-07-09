@@ -2,6 +2,7 @@ export default () => ({
   port: parseInt(process.env.PORT ?? "4000", 10),
   nodeEnv: process.env.NODE_ENV ?? "development",
   corsOrigins: (process.env.CORS_ORIGINS ?? "http://localhost:3000,http://localhost:3001").split(","),
+  cookieDomain: process.env.COOKIE_DOMAIN || undefined,
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET ?? "",
     refreshSecret: process.env.JWT_REFRESH_SECRET ?? "",
