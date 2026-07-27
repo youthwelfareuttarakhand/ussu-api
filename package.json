@@ -11,7 +11,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
-    "prepare": "git config core.hooksPath scripts/git-hooks"
+    "prepare": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath scripts/git-hooks || true"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
