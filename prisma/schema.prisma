@@ -15,6 +15,9 @@ enum Role {
   ADMIN
 }
 
+// Staff review outcome. APPROVED issues ukssuId (see
+// AdmissionsService.updateStatus) — only allowed once Admission.paid is
+// true. REJECTED has no side effects. UNDER_REVIEW/SUBMITTED are informational.
 enum AdmissionStatus {
   SUBMITTED
   UNDER_REVIEW
@@ -22,25 +25,125 @@ enum AdmissionStatus {
   REJECTED
 }
 
+// GAP_YEAR_UNDERTAKING (Annexure-B) is optional — only relevant when
+// AcademicDetails.gapYear is true. ANTI_RAGGING_STUDENT/ANTI_RAGGING_PARENT
+// (Annexure C & D) are mandatory for everyone, per UGC Anti-Ragging
+// Regulations 2009 declaration.
+enum DocumentType {
+  PHOTO
+  SIGNATURE
+  MARKSHEET_10
+  MARKSHEET_12
+  AADHAR
+  CATEGORY_CERTIFICATE
+  SPORTS_CERTIFICATE
+  MEDICAL_FITNESS_CERTIFICATE
+  GRADUATION_CERTIFICATE
+  GAP_YEAR_UNDERTAKING
+  ANTI_RAGGING_STUDENT
+  ANTI_RAGGING_PARENT
+  OTHER
+}
+
+// Uttarakhand's 13 districts. A fixed, closed list (state boundaries don't
+// change) — a Postgres enum instead of a lookup table. Display labels live in
+// code (src/reference) next to this enum, not in the DB.
+enum District {
+  ALMORA
+  BAGESHWAR
+  CHAMOLI
+  CHAMPAWAT
+  DEHRADUN
+  HARIDWAR
+  NAINITAL
+  PAURI_GARHWAL
+  PITHORAGARH
+  RUDRAPRAYAG
+  TEHRI_GARHWAL
+  UDHAM_SINGH_NAGAR
+  UTTARKASHI
+}
+
+enum ProgrammeLevel {
+  UG
+  PG
+  DIPLOMA
+}
+
+// Seeded reference list for the admission form's Nationality field (see
+// prisma/seed.ts). A real table, not an enum, since it's a long list (~195
+// rows) that's easier to seed/query than hardcode as an enum.
+model Country {
+  id   String @id @default(cuid())
+  name String @unique
+}
+
+// Seeded reference list for the admission form's Religion field (see
+// prisma/seed.ts).
+model Religion {
+  id   String @id @default(cuid())
+  name String @unique
+}
+
+// Concrete courses offered under each programme level. Unlike District, this
+// list grows over time (new courses added), so it's a real table rather than
+// an enum.
+model Course {
+  id        String         @id @default(cuid())
+  name      String         @unique
+  level     ProgrammeLevel
+  createdAt DateTime       @default(now())
+}
+
 model User {
-  id            String         @id @default(cuid())
-  email         String         @unique
-  passwordHash  String
-  role          Role
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  student       Student?
-  staff         Staff?
-  refreshTokens RefreshToken[]
+  id                 String         @id @default(cuid())
+  email              String         @unique
+  passwordHash       String
+  role               Role
+  // The primary human-facing identifier used to look someone up. See
+  // docs/DATABASE.md for the format. Staff/admin get one immediately at
+  // creation. Self-registered students get NULL until staff APPROVE their
+  // admission (AdmissionsService.updateStatus, requires Admission.paid) —
+  // registering is not the same as being admitted, so a student has no UKSSU
+  // ID (and no meaningful portal access) until then. Nullable so multiple
+  // not-yet-approved students don't collide under the unique constraint
+  // (Postgres treats NULLs as distinct).
+  ukssuId            String?        @unique
+  // Issued immediately at web signup (ApplicationsService.create), distinct
+  // from ukssuId which is only issued on staff admission approval. Gives
+  // self-registered applicants a reference number before/regardless of
+  // approval. Nullable for the same reason as ukssuId: staff/admin/seeded
+  // users don't get one.
+  registrationNumber String?        @unique
+  fullName           String
+  // Nullable so seeded staff/admin without a phone on file don't collide —
+  // Postgres treats multiple NULLs as distinct under a unique constraint.
+  // Always set for applicants created via the admissions flow.
+  phone              String?        @unique
+  dob                DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  student            Student?
+  staff              Staff?
+  refreshTokens      RefreshToken[]
 }
 
 model Student {
-  id         String     @id @default(cuid())
-  userId     String     @unique
-  user       User       @relation(fields: [userId], references: [id])
-  rollNumber String?    @unique
-  programme  String?
-  admission  Admission?
+  id             String          @id @default(cuid())
+  userId         String          @unique
+  user           User            @relation(fields: [userId], references: [id])
+  rollNumber     String?         @unique
+  programme      String?
+  // Set at registration time (ApplicationsService.create). Moved here from
+  // Admission.formData — district is applicant-level data known before the
+  // Admission row even exists (Admission is now created later, when the
+  // applicant starts the dashboard admission form).
+  district       District?
+  // The UG/PG/Diploma level for `programme` above (which only holds the
+  // resolved course name) — shown as a separate read-only field on the
+  // dashboard admission form.
+  programmeLevel ProgrammeLevel?
+  admission      Admission?
 }
 
 model Staff {
@@ -51,19 +154,157 @@ model Staff {
   designation String?
 }
 
-// ponytail: formData is a JSON blob instead of normalized columns because the
-// admissions form fields aren't finalized across ussu-web + portal yet. Upgrade
-// to real columns once the form schema stabilizes and filtering/reporting on
-// specific fields at the DB level is actually needed.
+// One row per admission batch/cycle (e.g. "2026-2027"). Only one batch is
+// ever active at a time (enforced at the application layer, not the DB —
+// activating a batch deactivates all others in the same transaction). The
+// dashboard admission form doesn't offer a picker; it just attaches whichever
+// batch is currently active.
+model AdmissionBatch {
+  id         String      @id @default(cuid())
+  label      String      @unique
+  isActive   Boolean     @default(false)
+  startedAt  DateTime    @default(now())
+  admissions Admission[]
+}
+
+// Created as a DRAFT the moment an applicant starts the dashboard admission
+// form (GET /admissions/draft, get-or-create) — no longer created at
+// registration time. Filled progressively across 5 steps (all detail fields
+// below are nullable for that reason). Admission-fee payment flips `paid` to
+// true (AdmissionsService.verifyDraftPayment); staff then APPROVE or REJECT
+// via `status` (AdmissionsService.updateStatus) — APPROVED issues ukssuId.
 model Admission {
-  id          String          @id @default(cuid())
-  studentId   String          @unique
-  student     Student         @relation(fields: [studentId], references: [id])
-  status      AdmissionStatus @default(SUBMITTED)
-  formData    Json
-  submittedAt DateTime        @default(now())
+  id        String          @id @default(cuid())
+  studentId String          @unique
+  student   Student         @relation(fields: [studentId], references: [id])
+  batchId   String
+  batch     AdmissionBatch  @relation(fields: [batchId], references: [id])
+  status    AdmissionStatus @default(SUBMITTED)
+  paid      Boolean         @default(false)
+
+  // Personal-detail snapshot captured on step 1 of the admission form.
+  // Course/programme/district are NOT duplicated here — see Student.district
+  // and Student.programme, set at registration time.
+  nationality           String?
+  aadharNumber          String?
+  // Official codes: UR / OBC-NCL / SC / ST / EWS / PwD. Drives the admission
+  // fee (see AdmissionsService.feeForCategory) and Category Certificate
+  // upload requirement (reserved categories only).
+  category              String?
+  gender                String?
+  bloodGroup            String?
+  uttarakhandDomicile   Boolean?
+  mediumOfInstruction   String?
+  hostelRequired        Boolean?
+  // Only meaningful when the applicant's programme is Diploma in Sports
+  // Coaching — one of Badminton/Basketball/Hockey/Ice Sports/Karate/
+  // Swimming/Taekwondo.
+  coachingDiscipline    String?
+  // Set when the applicant checks the declaration checkbox on the final
+  // step, just before the admission-fee Razorpay order is created.
+  declarationAcceptedAt DateTime?
+
+  // Admission fee payment (the only payment in the flow — signup is free).
+  // Set by the draft/verify-payment endpoint.
+  razorpayOrderId   String?   @unique
+  razorpayPaymentId String?
+  amountPaid        Int?
+  paidAt            DateTime?
+
+  submittedAt DateTime  @default(now())
   reviewedAt  DateTime?
   reviewedBy  String?
+
+  parentDetails   ParentDetails?
+  addressDetails  AddressDetails?
+  academicDetails AcademicDetails?
+  sportsDetails   SportsDetails?
+  documents       Document[]
+}
+
+model ParentDetails {
+  id            String    @id @default(cuid())
+  admissionId   String    @unique
+  admission     Admission @relation(fields: [admissionId], references: [id])
+  fatherName    String?
+  motherName    String?
+  // "Guardian's Name (if applicable)" on the official form — optional,
+  // distinct from guardianPhone/guardianEmail below (which are USSU-only
+  // extras, kept alongside the official fields).
+  guardianName  String?
+  guardianPhone String?
+  guardianEmail String?
+  occupation    String?
+}
+
+// Matches the official form's single "Correspondence Address" field — no
+// permanent/correspondence split.
+model AddressDetails {
+  id          String    @id @default(cuid())
+  admissionId String    @unique
+  admission   Admission @relation(fields: [admissionId], references: [id])
+  line1       String?
+  line2       String?
+  city        String?
+  state       String?
+  pincode     String?
+}
+
+model AcademicDetails {
+  id                    String    @id @default(cuid())
+  admissionId           String    @unique
+  admission             Admission @relation(fields: [admissionId], references: [id])
+  tenthBoard            String?
+  tenthRollNo           String?
+  tenthYear             Int?
+  tenthPercentage       Float?
+  twelfthBoard          String?
+  twelfthStream         String?
+  twelfthYear           Int?
+  twelfthPercentage     Float?
+  // Gap between Class XII and this application — "Yes" requires a Gap-Year
+  // Undertaking (Annexure-B) at physical document verification, not upload.
+  gapYear               Boolean?
+  // Diploma in Sports Coaching applicants only — everyone else leaves these
+  // null. Not enforced at the DB layer; gated in the UI/DTO by programme.
+  graduationDiscipline  String?
+  graduationInstitution String?
+  graduationYear        Int?
+  graduationPercentage  Float?
+}
+
+// Section 4 of the official form — mandatory for all applicants, with a
+// higher bar (two-time National/Inter-University participation) enforced
+// off-platform for Diploma applicants, not in the schema.
+model SportsDetails {
+  id                  String    @id @default(cuid())
+  admissionId         String    @unique
+  admission           Admission @relation(fields: [admissionId], references: [id])
+  primarySport        String?
+  highestLevel        String?
+  positionHeld        String?
+  certifyingAuthority String?
+  yearOfAchievement   Int?
+  eminentSportsperson Boolean?
+}
+
+// Stored one of two ways, decided by StorageService based on which env vars
+// are set: `url` (Azure Blob — production only, see StorageService) OR
+// `data`+`mimeType` (raw bytes in Postgres — staging/local dev fallback,
+// free, no external service, since those environments deliberately don't
+// get real Azure credentials). Exactly one of the two pairs is set per row.
+model Document {
+  id          String       @id @default(cuid())
+  admissionId String
+  admission   Admission    @relation(fields: [admissionId], references: [id])
+  type        DocumentType
+  filename    String
+  url         String?
+  data        Bytes?
+  mimeType    String?
+  uploadedAt  DateTime     @default(now())
+
+  @@index([admissionId])
 }
 
 model Notice {
@@ -83,4 +324,41 @@ model RefreshToken {
   tokenHash String
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+// Atomic per-(year, roleCode) sequence source for UKSSU IDs. One row per
+// pair, incremented via Prisma's atomic `increment` (a single Postgres
+// UPDATE ... SET value = value + 1, row-locked — no raw SQL, no collisions
+// under concurrent signups). See docs/DATABASE.md for the ID format.
+model UkssuIdCounter {
+  year     Int
+  roleCode String
+  value    Int    @default(0)
+
+  @@id([year, roleCode])
+}
+
+// Atomic per-year sequence source for registration numbers (web signup
+// reference numbers, separate from UKSSU IDs). No roleCode dimension — only
+// self-registered students via ApplicationsService.create get one. Same
+// atomic-increment pattern as UkssuIdCounter. See docs/DATABASE.md.
+model RegistrationNumberCounter {
+  year  Int @id
+  value Int @default(0)
+}
+
+// One row per page load on ussu-web, pinged from the client on route change
+// (fire-and-forget, failures ignored). Powers the admin dashboard's traffic
+// stats. Deliberately simple — a raw hit log with IP, not a real analytics
+// SDK (mirrors how the sibling KheloUK platform tracks visitors: a plain
+// self-hosted counter, not PostHog/GA). Uniqueness is computed at query time
+// (DISTINCT ip over a date range), not enforced here — every hit is stored.
+model PageVisit {
+  id        String   @id @default(cuid())
+  path      String
+  ip        String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([ip])
 }

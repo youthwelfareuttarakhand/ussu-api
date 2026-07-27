@@ -10,6 +10,11 @@ import { StudentsModule } from "./students/students.module";
 import { StaffModule } from "./staff/staff.module";
 import { AdmissionsModule } from "./admissions/admissions.module";
 import { NoticesModule } from "./notices/notices.module";
+import { PaymentsModule } from "./payments/payments.module";
+import { ReferenceModule } from "./reference/reference.module";
+import { ApplicationsModule } from "./applications/applications.module";
+import { UkssuModule } from "./ukssu/ukssu.module";
+import { AnalyticsModule } from "./analytics/analytics.module";
 
 @Module({
   imports: [
@@ -25,6 +30,11 @@ import { NoticesModule } from "./notices/notices.module";
     StaffModule,
     AdmissionsModule,
     NoticesModule,
+    PaymentsModule,
+    ReferenceModule,
+    ApplicationsModule,
+    UkssuModule,
+    AnalyticsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

@@ -19,8 +19,8 @@ export class AuthService {
     private prisma: PrismaService,
   ) {}
 
-  async validateCredentials(email: string, password: string) {
-    const user = await this.users.findByEmail(email);
+  async validateCredentials(identifier: string, password: string) {
+    const user = await this.users.findByEmailOrPhone(identifier);
     if (!user) throw new UnauthorizedException("Invalid credentials");
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) throw new UnauthorizedException("Invalid credentials");
@@ -31,7 +31,7 @@ export class AuthService {
     return { sub: user.id, email: user.email, role: user.role };
   }
 
-  private async issueAndSetCookies(res: Response, user: { id: string; email: string; role: AuthUser["role"] }) {
+  async issueAndSetCookies(res: Response, user: { id: string; email: string; role: AuthUser["role"] }) {
     const payload = this.payloadFor(user);
     const accessToken = this.jwt.sign(payload, {
       secret: this.config.get<string>("jwt.accessSecret"),
@@ -73,8 +73,8 @@ export class AuthService {
     return { httpOnly: true, secure, sameSite, domain };
   }
 
-  async login(email: string, password: string, res: Response) {
-    const user = await this.validateCredentials(email, password);
+  async login(identifier: string, password: string, res: Response) {
+    const user = await this.validateCredentials(identifier, password);
     await this.issueAndSetCookies(res, user);
     return this.payloadFor(user);
   }

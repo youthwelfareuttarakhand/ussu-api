@@ -1,5 +1,19 @@
 import { PrismaClient } from "@prisma/client";
 import * as bcrypt from "bcrypt";
+import { COUNTRIES } from "./data/countries";
+
+const RELIGIONS = [
+  "Hinduism",
+  "Islam",
+  "Christianity",
+  "Sikhism",
+  "Buddhism",
+  "Jainism",
+  "Judaism",
+  "Zoroastrianism",
+  "Atheist / No Religion",
+  "Other",
+];
 
 const prisma = new PrismaClient();
 
@@ -8,31 +22,54 @@ async function main() {
 
   const admin = await prisma.user.upsert({
     where: { email: "admin@ukssu.ac.in" },
-    update: {},
-    create: { email: "admin@ukssu.ac.in", passwordHash, role: "ADMIN" },
+    update: { fullName: "USSU Administrator", ukssuId: "UKSSU-2026-ADM-000001" },
+    create: {
+      email: "admin@ukssu.ac.in",
+      passwordHash,
+      role: "ADMIN",
+      fullName: "USSU Administrator",
+      ukssuId: "UKSSU-2026-ADM-000001",
+    },
   });
 
   const staffUser = await prisma.user.upsert({
     where: { email: "staff@ukssu.ac.in" },
-    update: {},
+    update: { fullName: "Admissions Officer", ukssuId: "UKSSU-2026-STF-000001" },
     create: {
       email: "staff@ukssu.ac.in",
       passwordHash,
       role: "STAFF",
+      fullName: "Admissions Officer",
+      ukssuId: "UKSSU-2026-STF-000001",
       staff: { create: { department: "Admissions", designation: "Officer" } },
     },
   });
 
   const studentUser = await prisma.user.upsert({
     where: { email: "student@ukssu.ac.in" },
-    update: {},
+    update: {
+      fullName: "Sample Student",
+      ukssuId: "UKSSU-2026-STU-000001",
+      phone: "9999999999",
+      dob: new Date("2006-04-15"),
+    },
     create: {
       email: "student@ukssu.ac.in",
       passwordHash,
       role: "STUDENT",
-      student: { create: { rollNumber: "USSU2026001", programme: "B.P.Ed" } },
+      fullName: "Sample Student",
+      ukssuId: "UKSSU-2026-STU-000001",
+      phone: "9999999999",
+      dob: new Date("2006-04-15"),
+      student: { create: { rollNumber: "USSU2026001", programme: "B.P.Ed", district: "DEHRADUN" } },
     },
     include: { student: true },
+  });
+
+  const batch = await prisma.admissionBatch.upsert({
+    where: { label: "2026-2027" },
+    update: { isActive: true },
+    create: { label: "2026-2027", isActive: true },
   });
 
   const student = await prisma.student.findUnique({ where: { userId: studentUser.id } });
@@ -42,11 +79,27 @@ async function main() {
       update: {},
       create: {
         studentId: student.id,
+        batchId: batch.id,
         status: "UNDER_REVIEW",
-        formData: { programme: "B.P.Ed", previousSchool: "Govt. Inter College" },
+        paid: true,
       },
     });
   }
+
+  await Promise.all(
+    [
+      { name: "B.Sc. Sports Science", level: "UG" as const },
+      { name: "B.Sc. Sports Management", level: "UG" as const },
+      { name: "B.Sc. Sports Journalism", level: "UG" as const },
+      { name: "Sports Coaching", level: "DIPLOMA" as const },
+    ].map((course) =>
+      prisma.course.upsert({
+        where: { name: course.name },
+        update: {},
+        create: course,
+      }),
+    ),
+  );
 
   await prisma.notice.createMany({
     data: [
@@ -56,7 +109,17 @@ async function main() {
     skipDuplicates: true,
   });
 
-  console.log("Seeded admin, staff, student users + sample notices.");
+  await prisma.country.createMany({
+    data: COUNTRIES.map((name) => ({ name })),
+    skipDuplicates: true,
+  });
+
+  await prisma.religion.createMany({
+    data: RELIGIONS.map((name) => ({ name })),
+    skipDuplicates: true,
+  });
+
+  console.log("Seeded admin, staff, student users, sample notices, countries, and religions.");
 }
 
 main()

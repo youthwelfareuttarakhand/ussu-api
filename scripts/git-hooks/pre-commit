@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+# Blocks a commit that changes prisma/schema.prisma without also updating
+# docs/DATABASE.md in the same commit. Wired up via `git config core.hooksPath
+# scripts/git-hooks` (see the "prepare" script in package.json, which runs it
+# automatically on `npm install`).
+
+staged=$(git diff --cached --name-only)
+
+if echo "$staged" | grep -q '^prisma/schema\.prisma$'; then
+  if ! echo "$staged" | grep -q '^docs/DATABASE\.md$'; then
+    echo "ERROR: prisma/schema.prisma changed but docs/DATABASE.md is not staged." >&2
+    echo "Update docs/DATABASE.md to describe the schema change and 'git add' it in the same commit." >&2
+    exit 1
+  fi
+fi
+
+exit 0
