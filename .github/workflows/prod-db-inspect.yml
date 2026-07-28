@@ -1,0 +1,26 @@
+name: Inspect prod DB schema (one-off)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install psql
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: List tables
+        run: psql "$PROD_DIRECT_URL" -c "SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name;"
+        env:
+          PROD_DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+
+      - name: Describe Admission columns
+        run: psql "$PROD_DIRECT_URL" -c "\d \"Admission\"" || true
+        env:
+          PROD_DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+
+      - name: List DocumentType enum values
+        run: psql "$PROD_DIRECT_URL" -c "SELECT enumlabel FROM pg_enum e JOIN pg_type t ON e.enumtypid = t.oid WHERE t.typname = 'DocumentType' ORDER BY e.enumsortorder;" || true
+        env:
+          PROD_DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
