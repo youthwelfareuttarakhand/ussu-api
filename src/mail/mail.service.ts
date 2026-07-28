@@ -34,7 +34,7 @@ export class MailService {
     const amountRupees = (params.amountPaidPaise / 100).toFixed(2);
 
     try {
-      await this.client.emails.send({
+      const result = await this.client.emails.send({
         from: this.from,
         to: params.to,
         subject: "Payment Successful — USSU Admission Application Complete",
@@ -48,6 +48,11 @@ export class MailService {
           },
         },
       });
+      // Resend resolves normally (doesn't throw) on API-level failures like
+      // an invalid/misconfigured template — the error only shows up here.
+      if (result.error) {
+        this.logger.error(`Resend rejected payment confirmation email to ${params.to}: ${JSON.stringify(result.error)}`);
+      }
     } catch (err) {
       this.logger.error(`Failed to send payment confirmation email to ${params.to}`, err instanceof Error ? err.stack : String(err));
     }
