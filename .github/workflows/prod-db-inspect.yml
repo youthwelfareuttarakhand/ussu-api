@@ -12,8 +12,31 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-      - name: Seed reference data
-        run: npx prisma db seed
+      - name: Seed reference data only (no test users)
+        run: |
+          node -e "
+          const { PrismaClient } = require('@prisma/client');
+          const { COUNTRIES } = require('./prisma/data/countries.ts');
+          " 2>/dev/null || true
+          npx ts-node -e "
+          import { PrismaClient } from '@prisma/client';
+          import { COUNTRIES } from './prisma/data/countries';
+          const RELIGIONS = ['Hinduism','Islam','Christianity','Sikhism','Buddhism','Jainism','Judaism','Zoroastrianism','Atheist / No Religion','Other'];
+          const prisma = new PrismaClient();
+          (async () => {
+            await Promise.all([
+              { name: 'B.Sc. Sports Science', level: 'UG' as const },
+              { name: 'B.Sc. Sports Management', level: 'UG' as const },
+              { name: 'B.Sc. Sports Journalism', level: 'UG' as const },
+              { name: 'Sports Coaching', level: 'DIPLOMA' as const },
+            ].map((course) => prisma.course.upsert({ where: { name: course.name }, update: {}, create: course })));
+            await prisma.admissionBatch.upsert({ where: { label: '2026-2027' }, update: { isActive: true }, create: { label: '2026-2027', isActive: true } });
+            await prisma.country.createMany({ data: COUNTRIES.map((name) => ({ name })), skipDuplicates: true });
+            await prisma.religion.createMany({ data: RELIGIONS.map((name) => ({ name })), skipDuplicates: true });
+            console.log('Seeded courses, active batch, countries, religions (no test users).');
+            await prisma.\$disconnect();
+          })();
+          "
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
           DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
