@@ -18,6 +18,12 @@ export class StudentsController {
     return this.students.findAll();
   }
 
+  @Get("registrations")
+  @Roles(Role.STAFF, Role.ADMIN)
+  findAllRegistrations() {
+    return this.students.findAllRegistrations();
+  }
+
   @Get("me")
   @Roles(Role.STUDENT)
   findMine(@CurrentUser() user: AuthUser) {

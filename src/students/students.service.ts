@@ -27,6 +27,19 @@ export class StudentsService {
     });
   }
 
+  // Every registered applicant, regardless of admission/payment progress —
+  // the portal's "Registrations" list (distinct from "Students", which is
+  // paid-only, and "Admissions Queue", which is submitted-application-only).
+  findAllRegistrations() {
+    return this.prisma.student.findMany({
+      orderBy: { user: { registrationNumber: "desc" } },
+      include: {
+        user: { select: this.userSelect },
+        admission: { select: { id: true, paid: true, status: true } },
+      },
+    });
+  }
+
   async findByUserId(userId: string) {
     const student = await this.prisma.student.findUnique({
       where: { userId },
