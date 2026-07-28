@@ -2,6 +2,8 @@ import { Body, Controller, Get, Param, Patch, UseGuards } from "@nestjs/common";
 import { Role } from "@prisma/client";
 import { Roles } from "../common/decorators/roles.decorator";
 import { RolesGuard } from "../common/guards/roles.guard";
+import { CurrentUser } from "../common/decorators/current-user.decorator";
+import type { AuthUser } from "../auth/strategies/jwt.strategy";
 import { StudentsService } from "./students.service";
 import { UpdateStudentDto } from "./dto/update-student.dto";
 
@@ -14,6 +16,12 @@ export class StudentsController {
   @Roles(Role.STAFF, Role.ADMIN)
   findAll() {
     return this.students.findAll();
+  }
+
+  @Get("me")
+  @Roles(Role.STUDENT)
+  findMine(@CurrentUser() user: AuthUser) {
+    return this.students.findByUserId(user.sub);
   }
 
   @Patch(":id")

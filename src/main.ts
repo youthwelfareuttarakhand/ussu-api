@@ -5,7 +5,9 @@ import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody: true — the Razorpay webhook needs the raw request bytes to
+  // verify its HMAC signature; the normal JSON body parser still runs too.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   const config = app.get(ConfigService);
 
   app.use(cookieParser());

@@ -9,4 +9,23 @@ export default () => ({
     accessExpiry: process.env.JWT_ACCESS_EXPIRY ?? "2h",
     refreshExpiry: process.env.JWT_REFRESH_EXPIRY ?? "7d",
   },
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID ?? "",
+    keySecret: process.env.RAZORPAY_KEY_SECRET ?? "",
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? "",
+    // Admission fee paid at the end of the dashboard admission form — the
+    // only payment in the flow, signup itself is free. Category-based per
+    // the official form: SC/ST/PwD pay the concession rate, everyone else
+    // pays the full rate (see AdmissionsService.feeForCategory).
+    admissionFeeFullPaise: 100000,
+    admissionFeeConcessionPaise: 50000,
+  },
+  mail: {
+    resendApiKey: process.env.RESEND_API_KEY ?? "",
+    fromAddress: process.env.MAIL_FROM_ADDRESS ?? "USSU Admissions <admissions@ukssu.ac.in>",
+  },
+  azureStorage: {
+    connectionString: process.env.AZURE_STORAGE_CONNECTION_STRING ?? "",
+    container: process.env.AZURE_STORAGE_CONTAINER ?? "",
+  },
 });
