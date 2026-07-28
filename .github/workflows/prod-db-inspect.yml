@@ -1,0 +1,21 @@
+name: Prod DB one-off inspect
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+      - name: Inspect
+        run: node scripts/prod-db-inspect.js
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
