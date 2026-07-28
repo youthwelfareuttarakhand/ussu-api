@@ -20,16 +20,21 @@ export class MailDiagnosticsController {
     if (!apiKey) return { apiKeySet: false, from };
 
     const client = new Resend(apiKey);
-    const domains = await client.domains.list();
-    const template = await client.templates.get("admission-fee-confirmation");
+    const result = await client.emails.send({
+      from: from!,
+      to: "admin@ukssu.ac.in",
+      subject: "Payment Successful — USSU Admission Application Complete",
+      template: {
+        id: "admission-fee-confirmation",
+        variables: {
+          fullName: "Diagnostic Test",
+          amountPaid: "1000.00",
+          paymentId: "test_diagnostic",
+          registrationNumber: "REG-TEST-000000",
+        },
+      },
+    });
 
-    return {
-      apiKeySet: true,
-      from,
-      domains: domains.data,
-      domainsError: domains.error,
-      template: template.data,
-      templateError: template.error,
-    };
+    return { apiKeySet: true, from, data: result.data, error: result.error };
   }
 }
