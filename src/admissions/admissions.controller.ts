@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   RawBodyRequest,
   Req,
   Res,
@@ -129,6 +130,22 @@ export class AdmissionsController {
   @Roles(Role.STUDENT)
   verifyDraftPayment(@CurrentUser() user: AuthUser, @Body() dto: VerifyPaymentDto) {
     return this.admissions.verifyDraftPayment(user.sub, dto.razorpayPaymentId, dto.razorpaySignature);
+  }
+
+  @Get(":id/documents/:docId/file")
+  @Roles(Role.STAFF, Role.ADMIN)
+  async getDocumentFileForStaff(
+    @Param("docId") docId: string,
+    @Query("download") download: string | undefined,
+    @Res() res: Response,
+  ) {
+    const doc = await this.admissions.getDocumentFileForStaff(docId);
+    const disposition = download ? "attachment" : "inline";
+    if (doc.url) return res.redirect(doc.url);
+    if (!doc.data) throw new BadRequestException("Document has no stored content");
+    res.setHeader("Content-Type", doc.mimeType ?? "application/octet-stream");
+    res.setHeader("Content-Disposition", `${disposition}; filename="${doc.filename}"`);
+    res.send(Buffer.from(doc.data));
   }
 
   // Declared last — a wildcard :id GET would otherwise shadow the static
