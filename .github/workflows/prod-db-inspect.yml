@@ -19,3 +19,7 @@ jobs:
         run: node scripts/prod-db-inspect.js
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+      - name: Delete applicant
+        run: node scripts/delete-applicant.js
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
