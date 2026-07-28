@@ -51,8 +51,14 @@ export class AdmissionsService {
     private mail: MailService,
   ) {}
 
+  // Staff queue only shows completed, paid applications — unpaid drafts
+  // (applicant started the form but never finished/paid) are noise for staff.
   findAll() {
-    return this.prisma.admission.findMany({ orderBy: { submittedAt: "desc" }, include: draftInclude });
+    return this.prisma.admission.findMany({
+      where: { paid: true },
+      orderBy: { submittedAt: "desc" },
+      include: draftInclude,
+    });
   }
 
   // Staff-facing single-admission detail view (the full form a student
