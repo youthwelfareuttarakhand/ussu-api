@@ -1,0 +1,20 @@
+name: One-off prod DB task
+
+on:
+  workflow_dispatch:
+
+jobs:
+  task:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install psql
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Rename courses
+        run: |
+          psql "$PROD_DIRECT_URL" -c "UPDATE \"Course\" SET name = 'Bachelor of Sports Science' WHERE name = 'B.Sc. Sports Science';"
+          psql "$PROD_DIRECT_URL" -c "UPDATE \"Course\" SET name = 'Bachelor of Sports Management' WHERE name = 'B.Sc. Sports Management';"
+          psql "$PROD_DIRECT_URL" -c "UPDATE \"Course\" SET name = 'Bachelor of Sports Journalism' WHERE name = 'B.Sc. Sports Journalism';"
+          psql "$PROD_DIRECT_URL" -c "SELECT id, name, level FROM \"Course\";"
+        env:
+          PROD_DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
