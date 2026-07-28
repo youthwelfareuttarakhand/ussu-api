@@ -88,9 +88,9 @@ async function main() {
 
   await Promise.all(
     [
-      { name: "B.Sc. Sports Science", level: "UG" as const },
-      { name: "B.Sc. Sports Management", level: "UG" as const },
-      { name: "B.Sc. Sports Journalism", level: "UG" as const },
+      { name: "Bachelor of Sports Science", level: "UG" as const },
+      { name: "Bachelor of Sports Management", level: "UG" as const },
+      { name: "Bachelor of Sports Journalism", level: "UG" as const },
       { name: "Sports Coaching", level: "DIPLOMA" as const },
     ].map((course) =>
       prisma.course.upsert({
