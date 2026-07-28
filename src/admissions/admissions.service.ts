@@ -257,14 +257,14 @@ export class AdmissionsService {
     if (!doc) throw new NotFoundException("Document not found");
     const admission = await this.prisma.admission.findUnique({ where: { id: doc.admissionId } });
     if (!admission || admission.studentId !== student.id) throw new NotFoundException("Document not found");
-    return doc;
+    return doc.url ? { ...doc, url: this.storage.getReadUrl(doc.url) } : doc;
   }
 
   // Staff/admin review access — no ownership check, gated by role at the controller.
   async getDocumentFileForStaff(documentId: string) {
     const doc = await this.prisma.document.findUnique({ where: { id: documentId } });
     if (!doc) throw new NotFoundException("Document not found");
-    return doc;
+    return doc.url ? { ...doc, url: this.storage.getReadUrl(doc.url) } : doc;
   }
 
   // Official form: ₹1,000 for UR/OBC-NCL/EWS, ₹500 for SC/ST/PwD. Unset or
