@@ -6,9 +6,12 @@ import { PaymentsService } from "../payments/payments.service";
 import { StudentsService } from "../students/students.service";
 import { UkssuService } from "../ukssu/ukssu.service";
 import { StorageService } from "../storage/storage.service";
+import { MailService } from "../mail/mail.service";
 import type { AdmissionStatus } from "@prisma/client";
 import type { CreateBatchDto } from "./dto/create-batch.dto";
 import type { PatchDraftAdmissionDto } from "./dto/patch-draft-admission.dto";
+
+const ALLOWED_DOCUMENT_MIME_TYPES = new Set(["application/pdf", "image/jpeg", "image/png"]);
 
 const draftInclude = {
   batch: true,
@@ -45,6 +48,7 @@ export class AdmissionsService {
     private payments: PaymentsService,
     private config: ConfigService,
     private storage: StorageService,
+    private mail: MailService,
   ) {}
 
   findAll() {
@@ -207,6 +211,11 @@ export class AdmissionsService {
     if (!Object.values(DocumentType).includes(type as DocumentType)) {
       throw new BadRequestException(`Unknown document type: ${type}`);
     }
+    // The frontend's file picker only accepts pdf/jpg/png as a UI hint — this
+    // is the actual enforcement, since a client can send any mimetype.
+    if (!ALLOWED_DOCUMENT_MIME_TYPES.has(file.mimetype)) {
+      throw new BadRequestException("Only PDF, JPG, and PNG files are accepted");
+    }
     const admission = await this.getEditableDraft(userId);
 
     const stored = await this.storage.store(`admissions/${admission.id}`, file.originalname, file.buffer, file.mimetype);
@@ -283,8 +292,7 @@ export class AdmissionsService {
 
   // Finalizes the admission: marks it paid/complete. Does NOT issue ukssuId —
   // that only happens once staff APPROVE the admission (updateStatus above),
-  // after the offline written + physical test. Idempotent (re-checks `paid`
-  // inside the transaction) so a client retry can't double-charge/error.
+  // after the offline written + physical test.
   async verifyDraftPayment(userId: string, paymentId: string, signature: string) {
     const student = await this.students.findByUserId(userId);
     const admission = await this.prisma.admission.findUnique({ where: { studentId: student.id } });
@@ -295,9 +303,28 @@ export class AdmissionsService {
     const valid = this.payments.verifyCheckoutSignature(admission.razorpayOrderId, paymentId, signature);
     if (!valid) throw new UnauthorizedException("Payment signature verification failed");
 
-    return this.prisma.$transaction(async (tx) => {
-      const fresh = await tx.admission.findUniqueOrThrow({ where: { id: admission.id } });
-      if (fresh.paid) return { paid: true };
+    await this.markPaidByOrderId(admission.razorpayOrderId, paymentId);
+    return { paid: true };
+  }
+
+  // Authoritative confirmation path — called from the Razorpay webhook
+  // (payment.captured) rather than the client. Exists so a payment still
+  // gets recorded even if the applicant's browser dies/loses connection
+  // right after paying, before the client-side verify-payment call lands.
+  // Looked up by razorpayOrderId since that's all the webhook payload has.
+  async handlePaymentCaptured(orderId: string, paymentId: string) {
+    await this.markPaidByOrderId(orderId, paymentId);
+  }
+
+  // Shared by both confirmation paths above. Idempotent (re-checks `paid`
+  // inside the transaction) so whichever of client-verify/webhook arrives
+  // first wins and the second is a no-op — no double-charge bookkeeping.
+  // Silently ignores an unknown orderId (e.g. a webhook for an order that
+  // isn't an admission fee order) rather than erroring.
+  private async markPaidByOrderId(orderId: string, paymentId: string) {
+    const justPaid = await this.prisma.$transaction(async (tx) => {
+      const admission = await tx.admission.findUnique({ where: { razorpayOrderId: orderId } });
+      if (!admission || admission.paid) return null;
 
       const amount = this.feeForCategory(admission.category);
       await tx.admission.update({
@@ -305,7 +332,23 @@ export class AdmissionsService {
         data: { paid: true, razorpayPaymentId: paymentId, amountPaid: amount, paidAt: new Date() },
       });
 
-      return { paid: true };
+      const student = await tx.student.findUnique({
+        where: { id: admission.studentId },
+        include: { user: { select: { email: true, fullName: true, registrationNumber: true } } },
+      });
+      return student ? { user: student.user, amount } : null;
     });
+
+    // Sent outside the transaction so a slow/failed email can never hold the
+    // DB transaction open or roll back the payment record.
+    if (justPaid) {
+      await this.mail.sendAdmissionPaymentConfirmed({
+        to: justPaid.user.email,
+        fullName: justPaid.user.fullName,
+        registrationNumber: justPaid.user.registrationNumber,
+        amountPaidPaise: justPaid.amount,
+        paymentId,
+      });
+    }
   }
 }

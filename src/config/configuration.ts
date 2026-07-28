@@ -20,6 +20,10 @@ export default () => ({
     admissionFeeFullPaise: 100000,
     admissionFeeConcessionPaise: 50000,
   },
+  mail: {
+    resendApiKey: process.env.RESEND_API_KEY ?? "",
+    fromAddress: process.env.MAIL_FROM_ADDRESS ?? "USSU Admissions <admissions@ukssu.ac.in>",
+  },
   azureStorage: {
     connectionString: process.env.AZURE_STORAGE_CONNECTION_STRING ?? "",
     container: process.env.AZURE_STORAGE_CONTAINER ?? "",

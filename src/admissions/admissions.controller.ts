@@ -1,11 +1,30 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Res, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
-import type { Response } from "express";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  Param,
+  Patch,
+  Post,
+  RawBodyRequest,
+  Req,
+  Res,
+  UnauthorizedException,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from "@nestjs/common";
+import type { Request, Response } from "express";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Role } from "@prisma/client";
+import { Public } from "../common/decorators/public.decorator";
 import { Roles } from "../common/decorators/roles.decorator";
 import { RolesGuard } from "../common/guards/roles.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import type { AuthUser } from "../auth/strategies/jwt.strategy";
+import { PaymentsService } from "../payments/payments.service";
 import { AdmissionsService } from "./admissions.service";
 import { CreateBatchDto } from "./dto/create-batch.dto";
 import { PatchDraftAdmissionDto } from "./dto/patch-draft-admission.dto";
@@ -118,5 +137,35 @@ export class AdmissionsController {
   @Roles(Role.STAFF, Role.ADMIN)
   findOne(@Param("id") id: string) {
     return this.admissions.findOne(id);
+  }
+}
+
+// Separate controller (different route prefix) so this module stays the
+// single owner of the payment-confirmation logic without a generic
+// "payments" module needing to depend back on admissions.
+@Controller("payments/webhook")
+export class PaymentsWebhookController {
+  constructor(
+    private payments: PaymentsService,
+    private admissions: AdmissionsService,
+  ) {}
+
+  @Post("razorpay")
+  @Public()
+  async handleRazorpayWebhook(@Req() req: RawBodyRequest<Request>, @Headers("x-razorpay-signature") signature: string) {
+    if (!req.rawBody || !signature) throw new UnauthorizedException("Missing webhook signature");
+    if (!this.payments.verifyWebhookSignature(req.rawBody, signature)) {
+      throw new UnauthorizedException("Invalid webhook signature");
+    }
+
+    const event = req.body;
+    if (event?.event === "payment.captured") {
+      const payment = event.payload?.payment?.entity;
+      if (payment?.order_id && payment?.id) {
+        await this.admissions.handlePaymentCaptured(payment.order_id, payment.id);
+      }
+    }
+
+    return { ok: true };
   }
 }
