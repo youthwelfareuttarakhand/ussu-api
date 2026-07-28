@@ -14,10 +14,6 @@ jobs:
       - run: npm ci
       - name: Seed reference data only (no test users)
         run: |
-          node -e "
-          const { PrismaClient } = require('@prisma/client');
-          const { COUNTRIES } = require('./prisma/data/countries.ts');
-          " 2>/dev/null || true
           npx ts-node -e "
           import { PrismaClient } from '@prisma/client';
           import { COUNTRIES } from './prisma/data/countries';
