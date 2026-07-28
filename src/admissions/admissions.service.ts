@@ -254,6 +254,13 @@ export class AdmissionsService {
     return doc;
   }
 
+  // Staff/admin review access — no ownership check, gated by role at the controller.
+  async getDocumentFileForStaff(documentId: string) {
+    const doc = await this.prisma.document.findUnique({ where: { id: documentId } });
+    if (!doc) throw new NotFoundException("Document not found");
+    return doc;
+  }
+
   // Official form: ₹1,000 for UR/OBC-NCL/EWS, ₹500 for SC/ST/PwD. Unset or
   // unrecognized category falls back to the full rate.
   private feeForCategory(category: string | null): number {
