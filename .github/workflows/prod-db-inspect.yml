@@ -10,7 +10,22 @@ jobs:
       - name: Install psql
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
-      - name: List applied migrations
-        run: psql "$PROD_DIRECT_URL" -c "SELECT migration_name, finished_at FROM _prisma_migrations ORDER BY started_at;"
+      - name: Migration status
+        run: psql "$PROD_DIRECT_URL" -c "SELECT migration_name, finished_at, rolled_back_at FROM _prisma_migrations ORDER BY started_at;"
+        env:
+          PROD_DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+
+      - name: Admission row count
+        run: psql "$PROD_DIRECT_URL" -c "SELECT count(*) FROM \"Admission\";"
+        env:
+          PROD_DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+
+      - name: Admission rows detail
+        run: psql "$PROD_DIRECT_URL" -c "SELECT id, \"studentId\", status, \"submittedAt\" FROM \"Admission\";"
+        env:
+          PROD_DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+
+      - name: User count
+        run: psql "$PROD_DIRECT_URL" -c "SELECT count(*) FROM \"User\";"
         env:
           PROD_DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
