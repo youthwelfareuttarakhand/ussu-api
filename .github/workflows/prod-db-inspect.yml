@@ -4,23 +4,21 @@ on:
   workflow_dispatch:
 
 jobs:
-  cleanup:
+  resolve:
     runs-on: ubuntu-latest
     steps:
-      - name: Install psql
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-
-      - name: Delete non-admin data (Admission -> Student/Staff -> RefreshToken -> User)
-        run: |
-          psql "$PROD_DIRECT_URL" -c "DELETE FROM \"Admission\" WHERE \"studentId\" IN (SELECT id FROM \"Student\" WHERE \"userId\" IN (SELECT id FROM \"User\" WHERE role != 'ADMIN'));"
-          psql "$PROD_DIRECT_URL" -c "DELETE FROM \"Student\" WHERE \"userId\" IN (SELECT id FROM \"User\" WHERE role != 'ADMIN');"
-          psql "$PROD_DIRECT_URL" -c "DELETE FROM \"Staff\" WHERE \"userId\" IN (SELECT id FROM \"User\" WHERE role != 'ADMIN');"
-          psql "$PROD_DIRECT_URL" -c "DELETE FROM \"RefreshToken\" WHERE \"userId\" IN (SELECT id FROM \"User\" WHERE role != 'ADMIN');"
-          psql "$PROD_DIRECT_URL" -c "DELETE FROM \"User\" WHERE role != 'ADMIN';"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Mark failed migration as rolled back
+        run: npx prisma migrate resolve --rolled-back 20260712120122_admission_rework_batches_documents
         env:
-          PROD_DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
-
-      - name: Confirm remaining users
-        run: psql "$PROD_DIRECT_URL" -c "SELECT id, email, role FROM \"User\";"
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+      - name: Confirm migration status
+        run: npx prisma migrate status
         env:
-          PROD_DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
