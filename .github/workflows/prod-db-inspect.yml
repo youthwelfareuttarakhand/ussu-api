@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  resolve:
+  seed:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -12,13 +12,8 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-      - name: Mark failed migration as rolled back
-        run: npx prisma migrate resolve --rolled-back 20260712120122_admission_rework_batches_documents
-        env:
-          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
-      - name: Confirm migration status
-        run: npx prisma migrate status
+      - name: Seed reference data
+        run: npx prisma db seed
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
           DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
