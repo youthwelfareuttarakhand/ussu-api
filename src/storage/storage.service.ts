@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { BlobServiceClient, type ContainerClient } from "@azure/storage-blob";
+import { BlobServiceClient, generateBlobSASQueryParameters, BlobSASPermissions, type ContainerClient } from "@azure/storage-blob";
 
 export type StoredFile = { kind: "azure"; url: string } | { kind: "db"; data: Buffer; mimeType: string };
 
@@ -17,6 +17,25 @@ export class StorageService {
     if (connectionString && containerName) {
       this.container = BlobServiceClient.fromConnectionString(connectionString).getContainerClient(containerName);
     }
+  }
+
+  // The container is private (no public read access), so a stored blob's
+  // plain `url` 403s on its own — callers must go through this to get a
+  // short-lived signed URL instead of ever serving the raw one.
+  getReadUrl(blobUrl: string): string {
+    if (!this.container) return blobUrl;
+    const blobName = decodeURIComponent(new URL(blobUrl).pathname.split("/").slice(2).join("/"));
+    const blockBlobClient = this.container.getBlockBlobClient(blobName);
+    const sas = generateBlobSASQueryParameters(
+      {
+        containerName: this.container.containerName,
+        blobName,
+        permissions: BlobSASPermissions.parse("r"),
+        expiresOn: new Date(Date.now() + 10 * 60 * 1000),
+      },
+      this.container.credential as import("@azure/storage-blob").StorageSharedKeyCredential,
+    ).toString();
+    return `${blockBlobClient.url}?${sas}`;
   }
 
   // Azure Blob when configured (production); otherwise falls back to
