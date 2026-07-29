@@ -347,6 +347,21 @@ model RegistrationNumberCounter {
   value Int @default(0)
 }
 
+// One row per /contact form submission on ussu-web (ContactController.create).
+// Purely an inbound-enquiry log — no relation to Admission/Student, since a
+// contact-form sender isn't necessarily a registered applicant.
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String?
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 // One row per page load on ussu-web, pinged from the client on route change
 // (fire-and-forget, failures ignored). Powers the admin dashboard's traffic
 // stats. Deliberately simple — a raw hit log with IP, not a real analytics

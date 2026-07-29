@@ -182,6 +182,19 @@ One row per page load on `ussu-web`, pinged from the client (`VisitPing` compone
 
 Powers `GET /analytics/overview` (registration/admission counts + a 7-day registration trend, STAFF/ADMIN only) and `GET /analytics/visitors` (unique visitor totals for the last 7 days/month/year + a 7-day trend, STAFF/ADMIN only), both consumed by the admin dashboard in `ussu-portal-web`.
 
+### `ContactMessage`
+One row per `/contact` form submission on `ussu-web` (`POST /contact`, public). Purely an inbound-enquiry log — no relation to `Admission`/`Student`, since a sender isn't necessarily a registered applicant. Persisted so submissions can be reviewed later even if the notification email fails; the email leg (`MailService.sendContactNotification`) is fire-and-forget and never blocks or rolls back the write.
+
+| Column | Type | Constraints | Meaning |
+|---|---|---|---|
+| `id` | `String` | PK, `cuid()` | |
+| `name` | `String` | not null | |
+| `email` | `String` | not null | |
+| `phone` | `String?` | nullable | Optional field on the form. |
+| `subject` | `String?` | nullable | Free-text category from the form's subject select (e.g. "Admissions", "Media"). |
+| `message` | `String` | not null | |
+| `createdAt` | `DateTime` | default `now()`, indexed | |
+
 ## UKSSU ID
 
 **Format:** `UKSSU-<year>-<roleCode>-<6-digit zero-padded sequence>`, e.g. `UKSSU-2026-STU-000123`.

@@ -15,6 +15,7 @@ import { ReferenceModule } from "./reference/reference.module";
 import { ApplicationsModule } from "./applications/applications.module";
 import { UkssuModule } from "./ukssu/ukssu.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
+import { ContactModule } from "./contact/contact.module";
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AnalyticsModule } from "./analytics/analytics.module";
     ApplicationsModule,
     UkssuModule,
     AnalyticsModule,
+    ContactModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

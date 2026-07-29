@@ -10,6 +10,33 @@ interface AdmissionPaymentConfirmedParams {
   paymentId: string;
 }
 
+interface ContactNotificationParams {
+  name: string;
+  email: string;
+  phone?: string;
+  subject?: string;
+  message: string;
+}
+
+const CONTACT_NOTIFICATION_TO = "admissions@ukssu.ac.in";
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
+    }
+  });
+}
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
@@ -55,6 +82,42 @@ export class MailService {
       }
     } catch (err) {
       this.logger.error(`Failed to send payment confirmation email to ${params.to}`, err instanceof Error ? err.stack : String(err));
+    }
+  }
+
+  // Plain HTML send (not Resend's Template API) — deliberate: a template
+  // needs to be created and published in the Resend dashboard first, which
+  // caused real friction for the payment-confirmation template. A contact
+  // notification ships without any external setup this way.
+  async sendContactNotification(params: ContactNotificationParams) {
+    if (!this.client) {
+      this.logger.warn(`RESEND_API_KEY not set — skipping contact notification from ${params.email}`);
+      return;
+    }
+
+    const html = `
+      <p><strong>New contact form submission</strong></p>
+      <p><strong>Name:</strong> ${escapeHtml(params.name)}</p>
+      <p><strong>Email:</strong> ${escapeHtml(params.email)}</p>
+      ${params.phone ? `<p><strong>Phone:</strong> ${escapeHtml(params.phone)}</p>` : ""}
+      ${params.subject ? `<p><strong>Subject:</strong> ${escapeHtml(params.subject)}</p>` : ""}
+      <p><strong>Message:</strong></p>
+      <p>${escapeHtml(params.message).replace(/\n/g, "<br />")}</p>
+    `;
+
+    try {
+      const result = await this.client.emails.send({
+        from: this.from,
+        to: CONTACT_NOTIFICATION_TO,
+        replyTo: params.email,
+        subject: `Contact Form: ${params.subject ?? "General Enquiry"} — ${params.name}`,
+        html,
+      });
+      if (result.error) {
+        this.logger.error(`Resend rejected contact notification from ${params.email}: ${JSON.stringify(result.error)}`);
+      }
+    } catch (err) {
+      this.logger.error(`Failed to send contact notification from ${params.email}`, err instanceof Error ? err.stack : String(err));
     }
   }
 }
