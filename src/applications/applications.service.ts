@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
+import { ConflictException, Injectable } from "@nestjs/common";
 import { Role } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import type { Response } from "express";
@@ -18,12 +18,6 @@ export class ApplicationsService {
   // Signup is free — no payment, no pending/holding row. Creates the real
   // account synchronously and logs the applicant in immediately.
   async create(dto: CreateApplicationDto, res: Response) {
-    const course = await this.prisma.course.findUnique({ where: { id: dto.courseId } });
-    if (!course) throw new BadRequestException("Unknown course");
-    if (course.level !== dto.programme) {
-      throw new BadRequestException("Selected course does not belong to the selected programme");
-    }
-
     const existingUser = await this.prisma.user.findFirst({
       where: { OR: [{ email: dto.email }, { phone: dto.phone }] },
     });
@@ -53,8 +47,11 @@ export class ApplicationsService {
           registrationNumber,
           student: {
             create: {
-              programme: course.name,
-              district: dto.district,
+              // Course (and hence `programme`, the resolved course name) is
+              // chosen later, in the dashboard admission form's step 1 —
+              // see AdmissionsService's handling of PatchDraftAdmissionDto.courseId.
+              countryId: dto.countryId,
+              stateId: dto.stateId ?? null,
               programmeLevel: dto.programme,
             },
           },

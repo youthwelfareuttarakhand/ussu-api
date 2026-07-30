@@ -19,9 +19,6 @@ Stack: PostgreSQL + Prisma. One migration baseline (`20260706090425_init`) plus 
 ### `DocumentType`
 `PHOTO | SIGNATURE | MARKSHEET_10 | MARKSHEET_12 | AADHAR | CATEGORY_CERTIFICATE | SPORTS_CERTIFICATE | MEDICAL_FITNESS_CERTIFICATE | GRADUATION_CERTIFICATE | OTHER` — what a `Document` row represents. `CATEGORY_CERTIFICATE` is only required for reserved categories (SC/ST/OBC-NCL/EWS/PwD); `GRADUATION_CERTIFICATE` is only required for Diploma in Sports Coaching applicants. Everything else is mandatory for all applicants (per `USSU_Online_Application_Form_2026-27`).
 
-### `District`
-The 13 districts of Uttarakhand (`ALMORA`, `BAGESHWAR`, `CHAMOLI`, `CHAMPAWAT`, `DEHRADUN`, `HARIDWAR`, `NAINITAL`, `PAURI_GARHWAL`, `PITHORAGARH`, `RUDRAPRAYAG`, `TEHRI_GARHWAL`, `UDHAM_SINGH_NAGAR`, `UTTARKASHI`). A fixed, closed list — modeled as a Postgres enum rather than a lookup table since state boundaries don't change. Display labels (e.g. `PAURI_GARHWAL` → "Pauri Garhwal") live in code at `src/reference/reference.service.ts`, not in the DB.
-
 ### `ProgrammeLevel`
 `UG | PG | DIPLOMA` — the three top-level categories of programme USSU offers. Used on `Course.level`.
 
@@ -53,11 +50,12 @@ Student-specific fields, 1:1 with a `User` where `role = STUDENT`.
 | `id` | `String` | PK, `cuid()` | |
 | `userId` | `String` | unique, FK → `User.id` | |
 | `rollNumber` | `String?` | unique (nullable) | The official university roll number — distinct from `ukssuId`. Assigned manually by staff, not at signup time. |
-| `programme` | `String?` | — | Free-text description of the student's declared programme (e.g. `"B.Sc. Sports Science"`). Set to the matching `Course.name` at registration time. |
-| `district` | `District?` | — | Set at registration time (`ApplicationsService.create`). District is known before the `Admission` row even exists — `Admission` is only created later, when the applicant starts the dashboard admission form. |
+| `programme` | `String?` | — | Free-text description of the student's declared programme (e.g. `"B.Sc. Sports Science"`). `NULL` until the applicant picks a course in the dashboard admission form's step 1 (`AdmissionsService`, set to the matching `Course.name`). |
+| `countryId` | `String?` | FK → `Country.id` | Set at registration time (`ApplicationsService.create`). Known before the `Admission` row even exists — `Admission` is only created later, when the applicant starts the dashboard admission form. |
+| `stateId` | `String?` | FK → `State.id` | Only set when `country` is India (enforced by the frontend hiding the State field otherwise). |
 | `programmeLevel` | `ProgrammeLevel?` | — | The UG/PG/Diploma level for `programme` above, set alongside it. |
 
-Relations: `user User`, `admission Admission?`.
+Relations: `user User`, `admission Admission?`, `country Country?`, `state State?`.
 
 ### `Staff`
 Staff-specific fields, 1:1 with a `User` where `role = STAFF`.
@@ -89,7 +87,7 @@ Created as a **draft** the moment an applicant first opens the dashboard admissi
 | `batchId` | `String` | FK → `AdmissionBatch.id` | The batch active at the moment this draft was created. |
 | `status` | `AdmissionStatus` | default `SUBMITTED` | See the enum's own note above — `APPROVED` is the real ukssuId-issuance gate. |
 | `paid` | `Boolean` | default `false` | `true` once the admission fee payment is verified. This unlocks staff review (Approve/Reject only appear once paid) — it is **not** the ukssuId gate by itself, `status = APPROVED` is. |
-| `nationality`, `aadharNumber`, `category`, `gender`, `bloodGroup` | mixed, all nullable | — | Personal-detail snapshot from step 1 of the admission form. Course/programme/district are **not** duplicated here — see `Student.district`/`Student.programme`, set earlier at registration. `category` uses the official codes `UR`/`OBC-NCL`/`SC`/`ST`/`EWS`/`PwD` and drives the admission fee (see [fee](#admission-fee)) and whether `CATEGORY_CERTIFICATE` is required. |
+| `nationality`, `aadharNumber`, `category`, `gender`, `bloodGroup` | mixed, all nullable | — | Personal-detail snapshot from step 1 of the admission form. Course/programme/country/state are **not** duplicated here — see `Student.country`/`Student.state`/`Student.programme`, set earlier at registration. `category` uses the official codes `UR`/`OBC-NCL`/`SC`/`ST`/`EWS`/`PwD` and drives the admission fee (see [fee](#admission-fee)) and whether `CATEGORY_CERTIFICATE` is required. |
 | `uttarakhandDomicile` | `Boolean?` | — | "Uttarakhand Domicile (Yes/No)" on the official form. |
 | `mediumOfInstruction` | `String?` | — | `"English"` or `"Hindi"`. |
 | `hostelRequired` | `Boolean?` | — | "Hostel Accommodation Required". |
@@ -109,7 +107,7 @@ Relations: `parentDetails ParentDetails?`, `addressDetails AddressDetails?`, `ac
 
 - `ParentDetails`: `fatherName`, `motherName`, `guardianName` (optional, "if applicable"), `guardianPhone`, `guardianEmail`, `occupation`.
 - `AddressDetails`: `line1`, `line2`, `city`, `state`, `pincode` — a single Correspondence Address, matching the official form (no permanent/correspondence split).
-- `AcademicDetails`: `tenthBoard`, `tenthRollNo`, `tenthYear`, `tenthPercentage`, `twelfthBoard`, `twelfthStream` (optional), `twelfthYear`, `twelfthPercentage`, `gapYear`, plus Diploma-only optional graduation fields `graduationDiscipline`, `graduationInstitution`, `graduationYear`, `graduationPercentage` (not DB-enforced to Diploma applicants, gated in the UI/DTO).
+- `AcademicDetails`: `tenthBoard`, `tenthRollNo`, `tenthYear`, `tenthPercentage`, `twelfthBoard`, `twelfthStream` (optional), `twelfthYear`, `twelfthPercentage`, `gapYear`, plus Diploma-only optional graduation fields `graduationDiscipline`, `graduationInstitution`, `graduationYear`, `graduationStatus` (`"APPEARING" | "PASSED"`), `graduationPercentage` (not DB-enforced to Diploma applicants, gated in the UI/DTO). When `graduationStatus` is `"APPEARING"`, `graduationPercentage` is left `NULL` (result pending) and the UI skips requiring the Graduation Certificate upload.
 - `SportsDetails`: `primarySport`, `highestLevel`, `positionHeld`, `certifyingAuthority`, `yearOfAchievement`, `eminentSportsperson` — Section 4 of the official form, mandatory for all applicants (Diploma applicants held to a higher off-platform bar: two-time National/Inter-University participation).
 
 ### `Document`
@@ -138,8 +136,29 @@ Simple announcements list (title/body), unrelated to the admissions flow.
 | `tokenHash` | `String` | **Stores a hash of the refresh token, never the raw token.** A raw token in the DB would let anyone with read access to the table impersonate any user by replaying it. |
 | `expiresAt` | `DateTime` | |
 
+### `Country`
+Seeded reference list for the applicant's country of residence (registration form) and the admission form's Nationality field — see `prisma/seed.ts` / `prisma/data/countries.ts` (~195 rows). A real table, not an enum, since the list is long and easier to seed/query.
+
+| Column | Type | Constraints | Meaning |
+|---|---|---|---|
+| `id` | `String` | PK, `cuid()` | |
+| `name` | `String` | unique | e.g. `"India"`. |
+
+Relations: `states State[]`.
+
+### `State`
+States/UTs, scoped to a `Country`. Only India is seeded (`prisma/data/india-states.ts`, all 28 states + 8 UTs) — the registration form only asks for State once the applicant picks India as their Country, so other countries have no rows here.
+
+| Column | Type | Constraints | Meaning |
+|---|---|---|---|
+| `id` | `String` | PK, `cuid()` | |
+| `name` | `String` | unique per `countryId` | e.g. `"Uttarakhand"`. |
+| `countryId` | `String` | FK → `Country.id` | |
+
+Relations: `country Country`.
+
 ### `Course`
-Concrete courses offered under each `ProgrammeLevel`. Unlike `District`, this is a real table (not an enum) because it's expected to grow over time — new courses get added, and it may later need fields like fee, duration, or seat count.
+Concrete courses offered under each `ProgrammeLevel`. Grows over time — new courses get added, and it may later need fields like fee, duration, or seat count — so it's a real table, not an enum.
 
 | Column | Type | Constraints | Meaning |
 |---|---|---|---|
@@ -147,7 +166,7 @@ Concrete courses offered under each `ProgrammeLevel`. Unlike `District`, this is
 | `name` | `String` | unique | e.g. `"B.Sc. Sports Science"`. |
 | `level` | `ProgrammeLevel` | — | Which top-level programme category this course belongs to. |
 
-Seeded via `prisma/seed.ts` — currently 3 UG courses (B.Sc. Sports Science, B.Sc. Sports Management, B.Sc. Sports Journalism) and 1 Diploma course (Sports Coaching). No PG courses exist yet.
+Seeded via `prisma/seed.ts` — currently 3 UG courses (B.Sc. Sports Science, B.Sc. Sports Management, B.Sc. Sports Journalism) and 1 Diploma course (Diploma in Sports Coaching). No PG courses exist yet.
 
 ### `UkssuIdCounter`
 The atomic sequence source for generating UKSSU IDs.
@@ -247,8 +266,8 @@ One linear, staff-gated flow. Signup is free and synchronous; the admission fee 
 
 ### Phase 1 — Signup (`src/applications`)
 
-1. **Stages 1 + 2 (client-side only, nothing in the DB yet).** The applicant fills in basic details (name, email, phone, DOB, district, programme, course) and chooses a password.
-2. **`POST /applications`.** Validates everything (including that the chosen course belongs to the chosen programme level), checks email/phone aren't already taken by an existing `User`, hashes the password, and — inside one transaction — issues a registration number (`RegistrationNumberService.nextNumber`) and creates the `User` (`registrationNumber` set, `ukssuId` left `NULL`) with a nested `Student` (`programme`/`district`/`programmeLevel` set). Sets auth cookies directly on the response (`AuthService.issueAndSetCookies`) — the applicant is logged in immediately, no separate login call needed. No `Admission` row is created here — that happens later, in Phase 2.
+1. **Stages 1 + 2 (client-side only, nothing in the DB yet).** The applicant fills in basic details (name, email, phone, DOB, country, state, programme level) and chooses a password. The specific course isn't chosen yet — that happens later, in the dashboard admission form's step 1.
+2. **`POST /applications`.** Checks email/phone aren't already taken by an existing `User`, hashes the password, and — inside one transaction — issues a registration number (`RegistrationNumberService.nextNumber`) and creates the `User` (`registrationNumber` set, `ukssuId` left `NULL`) with a nested `Student` (`countryId`/`stateId`/`programmeLevel` set; `programme` left `NULL` until the course is chosen). Sets auth cookies directly on the response (`AuthService.issueAndSetCookies`) — the applicant is logged in immediately, no separate login call needed. No `Admission` row is created here — that happens later, in Phase 2.
 3. **Done.** The applicant lands on a success screen showing their registration number, with a link to the dashboard — already authenticated.
 
 ### Phase 2 — Admission (`src/admissions`, dashboard 6-step form)

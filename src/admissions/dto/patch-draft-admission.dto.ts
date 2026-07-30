@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { IsBoolean, IsEmail, IsInt, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from "class-validator";
+import { IsBoolean, IsEmail, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from "class-validator";
 
 class PersonalDetailsDto {
   @IsOptional() @IsString() nationality?: string;
@@ -49,6 +49,7 @@ class AcademicDetailsDto {
   @IsOptional() @IsString() graduationDiscipline?: string;
   @IsOptional() @IsString() graduationInstitution?: string;
   @IsOptional() @IsInt() graduationYear?: number;
+  @IsOptional() @IsIn(["APPEARING", "PASSED"]) graduationStatus?: string;
   @IsOptional() @IsNumber() @Min(0) @Max(100) graduationPercentage?: number;
 }
 

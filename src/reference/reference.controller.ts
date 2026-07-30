@@ -1,4 +1,4 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Query } from "@nestjs/common";
 import { Public } from "../common/decorators/public.decorator";
 import { ReferenceService } from "./reference.service";
 
@@ -6,10 +6,10 @@ import { ReferenceService } from "./reference.service";
 export class ReferenceController {
   constructor(private reference: ReferenceService) {}
 
-  @Get("districts")
+  @Get("states")
   @Public()
-  getDistricts() {
-    return this.reference.getDistricts();
+  getStates(@Query("countryId") countryId: string) {
+    return this.reference.getStates(countryId);
   }
 
   @Get("courses")

@@ -45,25 +45,6 @@ enum DocumentType {
   OTHER
 }
 
-// Uttarakhand's 13 districts. A fixed, closed list (state boundaries don't
-// change) — a Postgres enum instead of a lookup table. Display labels live in
-// code (src/reference) next to this enum, not in the DB.
-enum District {
-  ALMORA
-  BAGESHWAR
-  CHAMOLI
-  CHAMPAWAT
-  DEHRADUN
-  HARIDWAR
-  NAINITAL
-  PAURI_GARHWAL
-  PITHORAGARH
-  RUDRAPRAYAG
-  TEHRI_GARHWAL
-  UDHAM_SINGH_NAGAR
-  UTTARKASHI
-}
-
 enum ProgrammeLevel {
   UG
   PG
@@ -74,8 +55,23 @@ enum ProgrammeLevel {
 // prisma/seed.ts). A real table, not an enum, since it's a long list (~195
 // rows) that's easier to seed/query than hardcode as an enum.
 model Country {
-  id   String @id @default(cuid())
-  name String @unique
+  id      String    @id @default(cuid())
+  name    String    @unique
+  states  State[]
+  Student Student[]
+}
+
+// States/UTs, scoped to a country. Only India is seeded today (see
+// prisma/data/india-states.ts) — the applicant's home state is only asked
+// for when Country = India, so other countries simply have no rows here.
+model State {
+  id        String    @id @default(cuid())
+  name      String
+  countryId String
+  country   Country   @relation(fields: [countryId], references: [id])
+  Student   Student[]
+
+  @@unique([countryId, name])
 }
 
 // Seeded reference list for the admission form's Religion field (see
@@ -85,9 +81,8 @@ model Religion {
   name String @unique
 }
 
-// Concrete courses offered under each programme level. Unlike District, this
-// list grows over time (new courses added), so it's a real table rather than
-// an enum.
+// Concrete courses offered under each programme level. Grows over time (new
+// courses added), so it's a real table rather than an enum.
 model Course {
   id        String         @id @default(cuid())
   name      String         @unique
@@ -134,11 +129,14 @@ model Student {
   user           User            @relation(fields: [userId], references: [id])
   rollNumber     String?         @unique
   programme      String?
-  // Set at registration time (ApplicationsService.create). Moved here from
-  // Admission.formData — district is applicant-level data known before the
-  // Admission row even exists (Admission is now created later, when the
-  // applicant starts the dashboard admission form).
-  district       District?
+  // Set at registration time (ApplicationsService.create) — applicant-level
+  // data known before the Admission row even exists (Admission is created
+  // later, when the applicant starts the dashboard admission form). State is
+  // only ever set when country is India.
+  countryId      String?
+  country        Country?        @relation(fields: [countryId], references: [id])
+  stateId        String?
+  state          State?          @relation(fields: [stateId], references: [id])
   // The UG/PG/Diploma level for `programme` above (which only holds the
   // resolved course name) — shown as a separate read-only field on the
   // dashboard admission form.
@@ -183,8 +181,9 @@ model Admission {
   paid      Boolean         @default(false)
 
   // Personal-detail snapshot captured on step 1 of the admission form.
-  // Course/programme/district are NOT duplicated here — see Student.district
-  // and Student.programme, set at registration time.
+  // Course/programme/country/state are NOT duplicated here — see
+  // Student.country/Student.state and Student.programme, set at registration
+  // time.
   nationality           String?
   aadharNumber          String?
   // Official codes: UR / OBC-NCL / SC / ST / EWS / PwD. Drives the admission
@@ -270,6 +269,10 @@ model AcademicDetails {
   graduationDiscipline  String?
   graduationInstitution String?
   graduationYear        Int?
+  // "APPEARING" | "PASSED" — when APPEARING, graduationPercentage isn't
+  // collected yet (result pending) and the Graduation Certificate upload is
+  // skipped in the UI (nothing to upload until they've passed).
+  graduationStatus      String?
   graduationPercentage  Float?
 }
 

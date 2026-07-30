@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { COUNTRIES } from "./data/countries";
+import { INDIA_STATES } from "./data/india-states";
 
 const RELIGIONS = [
   "Hinduism",
@@ -45,6 +46,20 @@ async function main() {
     },
   });
 
+  await prisma.country.createMany({
+    data: COUNTRIES.map((name) => ({ name })),
+    skipDuplicates: true,
+  });
+
+  const india = await prisma.country.findUniqueOrThrow({ where: { name: "India" } });
+
+  await prisma.state.createMany({
+    data: INDIA_STATES.map((name) => ({ name, countryId: india.id })),
+    skipDuplicates: true,
+  });
+
+  const uttarakhand = await prisma.state.findFirstOrThrow({ where: { countryId: india.id, name: "Uttarakhand" } });
+
   const studentUser = await prisma.user.upsert({
     where: { email: "student@ukssu.ac.in" },
     update: {
@@ -61,7 +76,7 @@ async function main() {
       ukssuId: "UKSSU-2026-STU-000001",
       phone: "9999999999",
       dob: new Date("2006-04-15"),
-      student: { create: { rollNumber: "USSU2026001", programme: "B.P.Ed", district: "DEHRADUN" } },
+      student: { create: { rollNumber: "USSU2026001", programme: "B.P.Ed", countryId: india.id, stateId: uttarakhand.id } },
     },
     include: { student: true },
   });
@@ -91,7 +106,7 @@ async function main() {
       { name: "Bachelor of Sports Science", level: "UG" as const },
       { name: "Bachelor of Sports Management", level: "UG" as const },
       { name: "Bachelor of Sports Journalism", level: "UG" as const },
-      { name: "Sports Coaching", level: "DIPLOMA" as const },
+      { name: "Diploma in Sports Coaching", level: "DIPLOMA" as const },
     ].map((course) =>
       prisma.course.upsert({
         where: { name: course.name },
@@ -109,17 +124,12 @@ async function main() {
     skipDuplicates: true,
   });
 
-  await prisma.country.createMany({
-    data: COUNTRIES.map((name) => ({ name })),
-    skipDuplicates: true,
-  });
-
   await prisma.religion.createMany({
     data: RELIGIONS.map((name) => ({ name })),
     skipDuplicates: true,
   });
 
-  console.log("Seeded admin, staff, student users, sample notices, countries, and religions.");
+  console.log("Seeded admin, staff, student users, sample notices, countries, India's states, and religions.");
 }
 
 main()
