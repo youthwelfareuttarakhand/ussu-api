@@ -17,12 +17,12 @@ export class StudentsService {
     dob: true,
   } as const;
 
-  // Only students who've actually completed admission (paid) show up here —
-  // matches the portal's "Students" list intent (enrolled students), not
-  // every applicant who merely registered or started the admission form.
+  // Only students with an assigned UKSSU ID show up here — matches the
+  // portal's "Students" list intent (enrolled students), not every applicant
+  // who merely paid but hasn't been approved yet.
   findAll() {
     return this.prisma.student.findMany({
-      where: { admission: { paid: true } },
+      where: { user: { ukssuId: { not: null } } },
       include: { user: { select: this.userSelect }, admission: { select: { id: true } } },
     });
   }

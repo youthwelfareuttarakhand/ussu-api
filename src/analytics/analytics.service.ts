@@ -31,7 +31,7 @@ export class AnalyticsService {
       this.prisma.admission.count(),
       this.prisma.admission.count({ where: { status: "APPROVED" } }),
       this.prisma.admission.count({ where: { status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } }),
-      this.prisma.student.count(),
+      this.prisma.student.count({ where: { user: { ukssuId: { not: null } } } }),
       this.prisma.staff.count(),
     ]);
 
