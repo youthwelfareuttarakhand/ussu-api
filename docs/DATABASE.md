@@ -91,7 +91,7 @@ Created as a **draft** the moment an applicant first opens the dashboard admissi
 | `uttarakhandDomicile` | `Boolean?` | — | "Uttarakhand Domicile (Yes/No)" on the official form. |
 | `mediumOfInstruction` | `String?` | — | `"English"` or `"Hindi"`. |
 | `hostelRequired` | `Boolean?` | — | "Hostel Accommodation Required". |
-| `coachingDiscipline` | `String?` | — | Only meaningful when the applicant's programme is Diploma in Sports Coaching — one of Badminton/Basketball/Hockey/Ice Sports/Karate/Swimming/Taekwondo. |
+| `coachingDiscipline` | `String?` | — | Only meaningful when the applicant's programme is Diploma in Sports Coaching — one of Badminton/Basketball/Boxing/Football/Hockey/Ice Sports/Karate/Swimming/Taekwondo. |
 | `declarationAcceptedAt` | `DateTime?` | — | Set when the applicant checks the declaration checkbox on the final step, just before the admission-fee Razorpay order is created (`POST /admissions/draft/pay` requires `declarationAccepted: true` in the body). |
 | `razorpayOrderId` | `String?` | unique | The Razorpay order for the admission fee — the only payment in the flow, signup itself is free. Set by `POST /admissions/draft/pay`. |
 | `razorpayPaymentId` | `String?` | — | Set once the admission-fee payment is verified. |

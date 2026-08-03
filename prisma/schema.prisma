@@ -196,8 +196,8 @@ model Admission {
   mediumOfInstruction   String?
   hostelRequired        Boolean?
   // Only meaningful when the applicant's programme is Diploma in Sports
-  // Coaching — one of Badminton/Basketball/Hockey/Ice Sports/Karate/
-  // Swimming/Taekwondo.
+  // Coaching — one of Badminton/Basketball/Boxing/Football/Hockey/
+  // Ice Sports/Karate/Swimming/Taekwondo.
   coachingDiscipline    String?
   // Set when the applicant checks the declaration checkbox on the final
   // step, just before the admission-fee Razorpay order is created.
