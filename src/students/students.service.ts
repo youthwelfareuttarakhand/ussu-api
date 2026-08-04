@@ -35,7 +35,7 @@ export class StudentsService {
       orderBy: { user: { registrationNumber: "desc" } },
       include: {
         user: { select: this.userSelect },
-        admission: { select: { id: true, paid: true, status: true, coachingDiscipline: true } },
+        admission: { select: { id: true, paid: true, status: true, coachingDiscipline: true, gender: true } },
       },
     });
   }

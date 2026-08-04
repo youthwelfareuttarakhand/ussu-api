@@ -27,10 +27,10 @@ export class AnalyticsService {
   }
 
   async overview() {
-    const [totalRegistrations, admissionsApproved, pendingAdmissions, totalStudents, totalStaff] = await Promise.all([
+    const [totalRegistrations, admissionsCompleted, pendingAdmissions, totalStudents, totalStaff] = await Promise.all([
       this.prisma.admission.count(),
-      this.prisma.admission.count({ where: { status: "APPROVED" } }),
-      this.prisma.admission.count({ where: { status: { in: ["SUBMITTED", "UNDER_REVIEW"] } } }),
+      this.prisma.admission.count({ where: { paid: true } }),
+      this.prisma.admission.count({ where: { paid: false } }),
       this.prisma.student.count({ where: { user: { ukssuId: { not: null } } } }),
       this.prisma.staff.count(),
     ]);
@@ -43,7 +43,7 @@ export class AnalyticsService {
       })),
     );
 
-    return { totalRegistrations, admissionsApproved, pendingAdmissions, totalStudents, totalStaff, registrationTrend };
+    return { totalRegistrations, admissionsCompleted, pendingAdmissions, totalStudents, totalStaff, registrationTrend };
   }
 
   async visitors() {
