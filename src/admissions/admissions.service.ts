@@ -268,10 +268,10 @@ export class AdmissionsService {
     return doc.url ? { ...doc, url: this.storage.getReadUrl(doc.url) } : doc;
   }
 
-  // Official form: ₹1,000 for UR/OBC-NCL/EWS, ₹500 for SC/ST/PwD. Unset or
+  // Official form: ₹1,000 for UR/OBC-NCL, ₹500 for SC/ST/PwD/EWS. Unset or
   // unrecognized category falls back to the full rate.
   private feeForCategory(category: string | null): number {
-    const concession = category === "SC" || category === "ST" || category === "PwD";
+    const concession = category === "SC" || category === "ST" || category === "PwD" || category === "EWS";
     return this.config.get<number>(concession ? "razorpay.admissionFeeConcessionPaise" : "razorpay.admissionFeeFullPaise")!;
   }
 
