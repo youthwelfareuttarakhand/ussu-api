@@ -23,7 +23,7 @@ export class AuthController {
   @Post("forgot-password")
   @HttpCode(200)
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.auth.resetPassword(dto.identifier, dto.newPassword, dto.confirmPassword);
+    return this.auth.resetPassword(dto.identifier, dto.fullName, dto.dob, dto.newPassword, dto.confirmPassword);
   }
 
   @Public()

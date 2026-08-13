@@ -89,19 +89,26 @@ export class AuthService {
     await this.issueAndSetCookies(res, user);
   }
 
-  // No verification step by design (see docs/superpowers/specs/2026-08-13-forgot-password-design.md) —
-  // returns the same message whether or not `identifier` matched a real account, so this
-  // can't be used to enumerate which emails/phones have accounts.
-  async resetPassword(identifier: string, newPassword: string, confirmPassword: string) {
+  // Verifies fullName + dob against the account on file (see
+  // docs/superpowers/specs/2026-08-13-forgot-password-design.md) — still no email/OTP
+  // step, but a mismatch on any field is now treated identically to "no account found":
+  // same generic response either way, so this can't be used to enumerate accounts or
+  // probe which field was wrong.
+  async resetPassword(identifier: string, fullName: string, dob: string, newPassword: string, confirmPassword: string) {
     if (newPassword !== confirmPassword) {
       throw new BadRequestException("Passwords do not match");
     }
     const user = await this.users.findByEmailOrPhone(identifier);
-    if (user) {
+    const matches =
+      user &&
+      user.fullName.trim().toLowerCase() === fullName.trim().toLowerCase() &&
+      user.dob &&
+      user.dob.toISOString().slice(0, 10) === dob.slice(0, 10);
+    if (matches) {
       const passwordHash = await bcrypt.hash(newPassword, 10);
       await this.users.updatePasswordHash(user.id, passwordHash);
     }
-    return { message: "If an account exists for that email or phone, the password has been updated." };
+    return { message: "If those details match an account, the password has been updated." };
   }
 
   logout(res: Response) {
