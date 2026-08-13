@@ -28,7 +28,7 @@ export class AnalyticsService {
 
   async overview() {
     const [totalRegistrations, admissionsCompleted, pendingAdmissions, totalStudents, totalStaff] = await Promise.all([
-      this.prisma.admission.count(),
+      this.prisma.student.count(),
       this.prisma.admission.count({ where: { paid: true } }),
       this.prisma.admission.count({ where: { paid: false } }),
       this.prisma.student.count({ where: { user: { ukssuId: { not: null } } } }),
