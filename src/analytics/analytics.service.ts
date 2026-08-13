@@ -27,19 +27,21 @@ export class AnalyticsService {
   }
 
   async overview() {
-    const [totalRegistrations, admissionsCompleted, pendingAdmissions, totalStudents, totalStaff] = await Promise.all([
+    const [totalRegistrations, admissionsCompleted, totalStudents, totalStaff] = await Promise.all([
       this.prisma.student.count(),
       this.prisma.admission.count({ where: { paid: true } }),
-      this.prisma.admission.count({ where: { paid: false } }),
       this.prisma.student.count({ where: { user: { ukssuId: { not: null } } } }),
       this.prisma.staff.count(),
     ]);
+    // Pending = every student who hasn't completed admission yet, including those who haven't
+    // started the admission form at all (no Admission row), not just unpaid Admission rows.
+    const pendingAdmissions = totalRegistrations - admissionsCompleted;
 
     const days = last7Days();
     const registrationTrend = await Promise.all(
       days.map(async ({ start, end, label }) => ({
         day: label,
-        count: await this.prisma.admission.count({ where: { submittedAt: { gte: start, lt: end } } }),
+        count: await this.prisma.student.count({ where: { user: { createdAt: { gte: start, lt: end } } } }),
       })),
     );
 
