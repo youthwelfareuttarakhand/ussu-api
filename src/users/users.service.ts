@@ -19,4 +19,8 @@ export class UsersService {
   findById(id: string) {
     return this.prisma.user.findUnique({ where: { id } });
   }
+
+  updatePasswordHash(id: string, passwordHash: string) {
+    return this.prisma.user.update({ where: { id }, data: { passwordHash } });
+  }
 }

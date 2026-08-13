@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import * as bcrypt from "bcrypt";
@@ -87,6 +87,21 @@ export class AuthService {
     const user = await this.users.findById(refreshUser.sub);
     if (!user) throw new UnauthorizedException();
     await this.issueAndSetCookies(res, user);
+  }
+
+  // No verification step by design (see docs/superpowers/specs/2026-08-13-forgot-password-design.md) —
+  // returns the same message whether or not `identifier` matched a real account, so this
+  // can't be used to enumerate which emails/phones have accounts.
+  async resetPassword(identifier: string, newPassword: string, confirmPassword: string) {
+    if (newPassword !== confirmPassword) {
+      throw new BadRequestException("Passwords do not match");
+    }
+    const user = await this.users.findByEmailOrPhone(identifier);
+    if (user) {
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      await this.users.updatePasswordHash(user.id, passwordHash);
+    }
+    return { message: "If an account exists for that email or phone, the password has been updated." };
   }
 
   logout(res: Response) {

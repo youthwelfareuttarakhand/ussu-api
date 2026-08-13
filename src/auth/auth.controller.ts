@@ -3,6 +3,7 @@ import { AuthGuard } from "@nestjs/passport";
 import type { Response } from "express";
 import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { Public } from "../common/decorators/public.decorator";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import type { AuthUser } from "./strategies/jwt.strategy";
@@ -16,6 +17,13 @@ export class AuthController {
   @HttpCode(200)
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     return this.auth.login(dto.identifier, dto.password, res);
+  }
+
+  @Public()
+  @Post("forgot-password")
+  @HttpCode(200)
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.auth.resetPassword(dto.identifier, dto.newPassword, dto.confirmPassword);
   }
 
   @Public()
