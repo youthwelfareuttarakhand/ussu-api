@@ -1,27 +1,38 @@
-// Prod's actual Diploma course is named "Sports Coaching", not "Diploma in
-// Sports Coaching" (what prisma/seed.ts and the initial backfill assumed) —
-// so the course-code backfill created a *separate*, unused duplicate row
-// instead of updating the real one, and every real DSC student's course
-// lookup (by Student.programme, which holds "Sports Coaching") kept finding
-// code: null. This sets the code on the real row and removes the duplicate.
+// Prod's actual Diploma course was named "Sports Coaching", not "Diploma in
+// Sports Coaching" (what seed.ts/the first backfill assumed) — so the first
+// course-code backfill created a separate, unused duplicate row (with code
+// "DSC" already set) instead of updating the real one. This deletes that
+// duplicate, then renames the real row to "Diploma in Sports Coaching" (the
+// correct/intended name) and sets its code, and updates every Student whose
+// snapshotted `programme` string said the old name so future course lookups
+// (by name) keep matching.
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-async function main() {
-  const real = await prisma.course.update({
-    where: { name: "Sports Coaching" },
-    data: { code: "DSC" },
-  });
-  console.log("Updated real course row:", real);
+const OLD_NAME = "Sports Coaching";
+const NEW_NAME = "Diploma in Sports Coaching";
 
-  const studentsOnDuplicate = await prisma.student.count({ where: { programme: "Diploma in Sports Coaching" } });
+async function main() {
+  const studentsOnDuplicate = await prisma.student.count({ where: { programme: NEW_NAME } });
   if (studentsOnDuplicate === 0) {
-    const deleted = await prisma.course.deleteMany({ where: { name: "Diploma in Sports Coaching" } });
-    console.log(`Removed ${deleted.count} unused duplicate course row(s).`);
+    const deleted = await prisma.course.deleteMany({ where: { name: NEW_NAME } });
+    console.log(`Removed ${deleted.count} unused duplicate course row(s) named "${NEW_NAME}".`);
   } else {
-    console.log(`Left duplicate row in place — ${studentsOnDuplicate} student(s) actually reference it.`);
+    console.log(`Skipped deleting "${NEW_NAME}" — ${studentsOnDuplicate} student(s) already reference it.`);
   }
+
+  const real = await prisma.course.update({
+    where: { name: OLD_NAME },
+    data: { name: NEW_NAME, code: "DSC" },
+  });
+  console.log("Renamed + coded the real course row:", real);
+
+  const updated = await prisma.student.updateMany({
+    where: { programme: OLD_NAME },
+    data: { programme: NEW_NAME },
+  });
+  console.log(`Updated ${updated.count} Student row(s) from programme "${OLD_NAME}" to "${NEW_NAME}".`);
 
   await prisma.$disconnect();
 }
