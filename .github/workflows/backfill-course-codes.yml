@@ -35,3 +35,24 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
           DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+
+      # Prod's real Diploma course is named "Sports Coaching", not "Diploma
+      # in Sports Coaching" — fixes the code on the real row and removes the
+      # unused duplicate the first backfill created.
+      - name: Fix DSC course code
+        run: npx ts-node prisma/fix-dsc-course-code.ts
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+
+      - name: Backfill roll numbers (retry after DSC fix)
+        run: npx ts-node prisma/backfill-roll-numbers.ts
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+
+      - name: Diagnose remaining gaps (final)
+        run: npx ts-node prisma/diagnose-roll-numbers.ts
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
