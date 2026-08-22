@@ -27,7 +27,9 @@ import { CurrentUser } from "../common/decorators/current-user.decorator";
 import type { AuthUser } from "../auth/strategies/jwt.strategy";
 import { PaymentsService } from "../payments/payments.service";
 import { AdmissionsService } from "./admissions.service";
+import { AdmitCardService } from "./admit-card.service";
 import { CreateBatchDto } from "./dto/create-batch.dto";
+import { UpdateBatchExamDetailsDto } from "./dto/update-batch-exam-details.dto";
 import { PatchDraftAdmissionDto } from "./dto/patch-draft-admission.dto";
 import { PayDraftDto } from "./dto/pay-draft.dto";
 import { UpdateAdmissionStatusDto } from "./dto/update-admission-status.dto";
@@ -38,7 +40,10 @@ const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
 @Controller("admissions")
 @UseGuards(RolesGuard)
 export class AdmissionsController {
-  constructor(private admissions: AdmissionsService) {}
+  constructor(
+    private admissions: AdmissionsService,
+    private admitCards: AdmitCardService,
+  ) {}
 
   @Get()
   @Roles(Role.STAFF, Role.ADMIN)
@@ -56,6 +61,15 @@ export class AdmissionsController {
   @Roles(Role.STAFF, Role.ADMIN)
   updateStatus(@Param("id") id: string, @Body() dto: UpdateAdmissionStatusDto, @CurrentUser() user: AuthUser) {
     return this.admissions.updateStatus(id, dto.status, user.email);
+  }
+
+  @Get("me/admit-card")
+  @Roles(Role.STUDENT)
+  async downloadMyAdmitCard(@CurrentUser() user: AuthUser, @Res() res: Response) {
+    const pdf = await this.admitCards.generateForUser(user.sub);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'attachment; filename="admit-card.pdf"');
+    res.send(pdf);
   }
 
   @Get("batches")
@@ -77,6 +91,12 @@ export class AdmissionsController {
   @Roles(Role.STAFF, Role.ADMIN)
   closeBatch(@Param("id") id: string) {
     return this.admissions.closeBatch(id);
+  }
+
+  @Patch("batches/:id/exam-details")
+  @Roles(Role.STAFF, Role.ADMIN)
+  updateBatchExamDetails(@Param("id") id: string, @Body() dto: UpdateBatchExamDetailsDto) {
+    return this.admissions.updateBatchExamDetails(id, dto);
   }
 
   @Get("draft")
@@ -146,6 +166,15 @@ export class AdmissionsController {
     res.setHeader("Content-Type", doc.mimeType ?? "application/octet-stream");
     res.setHeader("Content-Disposition", `${disposition}; filename="${doc.filename}"`);
     res.send(Buffer.from(doc.data));
+  }
+
+  @Get(":id/admit-card")
+  @Roles(Role.STAFF, Role.ADMIN)
+  async downloadAdmitCardForStaff(@Param("id") id: string, @Res() res: Response) {
+    const pdf = await this.admitCards.generateForAdmissionId(id);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'attachment; filename="admit-card.pdf"');
+    res.send(pdf);
   }
 
   // Declared last — a wildcard :id GET would otherwise shadow the static

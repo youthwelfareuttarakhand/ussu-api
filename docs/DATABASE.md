@@ -49,7 +49,7 @@ Student-specific fields, 1:1 with a `User` where `role = STUDENT`.
 |---|---|---|---|
 | `id` | `String` | PK, `cuid()` | |
 | `userId` | `String` | unique, FK → `User.id` | |
-| `rollNumber` | `String?` | unique (nullable) | The official university roll number — distinct from `ukssuId`. Assigned manually by staff, not at signup time. |
+| `rollNumber` | `String?` | unique (nullable) | The official university roll number — distinct from `ukssuId`. Auto-assigned the moment the student's admission becomes submitted+paid — see [Roll Number](#roll-number) below. |
 | `programme` | `String?` | — | Free-text description of the student's declared programme (e.g. `"B.Sc. Sports Science"`). `NULL` until the applicant picks a course in the dashboard admission form's step 1 (`AdmissionsService`, set to the matching `Course.name`). |
 | `countryId` | `String?` | FK → `Country.id` | Set at registration time (`ApplicationsService.create`). Known before the `Admission` row even exists — `Admission` is only created later, when the applicant starts the dashboard admission form. |
 | `stateId` | `String?` | FK → `State.id` | Only set when `country` is India (enforced by the frontend hiding the State field otherwise). |
@@ -76,6 +76,10 @@ One row per admission cycle (e.g. `"2026-2027"`). Only one batch is ever active 
 | `label` | `String` | unique | e.g. `"2026-2027"`. |
 | `isActive` | `Boolean` | default `false` | At most one `true` row at a time (app-enforced, not a DB constraint). |
 | `startedAt` | `DateTime` | default `now()` | |
+| `examDate` | `DateTime?` | — | Entrance exam date shown on the admit card. Nullable — a batch can exist before the exam is scheduled. Set/edited by staff via `PATCH /admissions/batches/:id/exam-details`. |
+| `reportingTime` | `String?` | — | Free-text reporting time (e.g. `"09:00 AM"`) shown on the admit card. |
+| `examCentreName` | `String?` | — | e.g. `"University Auditorium"`. |
+| `examCentreAddress` | `String?` | — | Full postal address of the exam centre. |
 
 ### `Admission`
 Created as a **draft** the moment an applicant first opens the dashboard admission form (`GET /admissions/draft`, get-or-create) — not at registration time. Filled in progressively across the 6-step form (personal detail columns below, plus the related `ParentDetails`/`AddressDetails`/`AcademicDetails`/`SportsDetails`/`Document` rows), then finalized by paying the admission fee (`paid` flips to `true`, `AdmissionsService.verifyDraftPayment`). `ukssuId` is **not** issued at payment — only once staff `APPROVE` via `status`. See [UKSSU ID](#ukssu-id) and the [lifecycle](#signup--admission--approval-lifecycle) section below.
@@ -165,8 +169,9 @@ Concrete courses offered under each `ProgrammeLevel`. Grows over time — new co
 | `id` | `String` | PK, `cuid()` | |
 | `name` | `String` | unique | e.g. `"B.Sc. Sports Science"`. |
 | `level` | `ProgrammeLevel` | — | Which top-level programme category this course belongs to. |
+| `code` | `String?` | unique (nullable) | Short form used in the roll number and the admit card's "Course Code" field (e.g. `"BSM"`, rendered as `"BSM-26"`). Nullable so a course can be added before someone assigns it a code. |
 
-Seeded via `prisma/seed.ts` — currently 3 UG courses (B.Sc. Sports Science, B.Sc. Sports Management, B.Sc. Sports Journalism) and 1 Diploma course (Diploma in Sports Coaching). No PG courses exist yet.
+Seeded via `prisma/seed.ts` — currently 3 UG courses (`BSS` B.Sc. Sports Science, `BSM` B.Sc. Sports Management, `BSJ` B.Sc. Sports Journalism) and 1 Diploma course (`DSC` Diploma in Sports Coaching). No PG courses exist yet.
 
 ### `UkssuIdCounter`
 The atomic sequence source for generating UKSSU IDs.
@@ -188,6 +193,17 @@ The atomic sequence source for generating registration numbers.
 | `value` | `Int` | default `0` | The last-issued sequence number for this year. |
 
 One row per year, created lazily the first time it's needed. See [Registration Number](#registration-number) below for the generation algorithm.
+
+### `RollNumberCounter`
+The atomic sequence source for generating roll numbers.
+
+| Column | Type | Constraints | Meaning |
+|---|---|---|---|
+| `year` | `Int` | PK (composite with `courseCode`) | |
+| `courseCode` | `String` | PK (composite with `year`) | `Course.code`, e.g. `"BSM"`. |
+| `value` | `Int` | default `0` | The last-issued sequence number for this (year, courseCode) pair. |
+
+One row per (year, courseCode) combination, created lazily the first time it's needed. See [Roll Number](#roll-number) below for the generation algorithm.
 
 ### `PageVisit`
 One row per page load on `ussu-web`, pinged from the client (`VisitPing` component in `packages/ui`, mounted in the root layout) on every route change via `POST /analytics/visit`. Deliberately simple — a raw hit log, not a real analytics SDK. Mirrors how the sibling KheloUK platform tracks traffic: a plain self-hosted counter table, not PostHog/GA (confirmed neither exists in either codebase).
@@ -250,6 +266,27 @@ No raw SQL is needed anywhere in this — it's all standard Prisma atomic operat
 2. If no row exists for this year yet, fall back to `INSERT ... VALUES (year, 1)`.
 3. If that insert races and loses (`P2002`), retry the atomic `UPDATE` from step 1.
 4. Format as `REG-${year}-${value.toString().padStart(6, "0")}`.
+
+## Roll Number
+
+**Format:** `<2-digit year><course code><6-digit zero-padded sequence>`, e.g. `26BSM000001` — distinct from both `UKSSU-2026-STU-000123` and `REG-2026-000123`.
+
+- Auto-assigned the moment an admission becomes **submitted AND paid** — not on staff approval (that's `ukssuId`) and not manually by staff (unlike before this feature existed). Assigned inside `AdmissionsService.markPaidByOrderId`, the single choke point both the client-verify (`POST /admissions/draft/verify-payment`) and Razorpay-webhook (`payments/webhook/razorpay`) confirmation paths funnel through — so whichever arrives first triggers it, and it's idempotent (no-ops if `Student.rollNumber` is already set).
+- Sequence is per (year, `Course.code`) — each course has its own independent counter, resetting each year.
+- Powers the [admit card](#admit-card) download — `AdmitCardService` 404s until a roll number exists.
+
+**Generation algorithm** (`RollNumberService.nextRollNumber`, `src/ukssu/roll-number.service.ts`), same atomic-counter pattern as `UkssuService.nextId`/`RegistrationNumberService.nextNumber`, against `RollNumberCounter`:
+
+1. Atomic `UPDATE RollNumberCounter SET value = value + 1 WHERE year = $1 AND courseCode = $2 RETURNING value`.
+2. If no row exists yet for this (year, courseCode) pair, fall back to `INSERT ... VALUES (year, courseCode, 1)`.
+3. If that insert races and loses (`P2002`), retry the atomic `UPDATE` from step 1.
+4. Format as `${yy}${courseCode}${value.toString().padStart(6, "0")}`.
+
+Admissions that were already submitted+paid before this feature existed were backfilled once via `prisma/backfill-roll-numbers.ts`, ordered by `submittedAt` ascending per course so sequence numbers reflect real submission order.
+
+## Admit Card
+
+`AdmitCardService` (`src/admissions/admit-card.service.ts`) generates a real PDF per applicant, overlaying dynamic fields (Course Code, Roll Number, Application No. — reusing `registrationNumber` — Candidate Name, Gender/Category, Father's Name, DOB, and, Diploma-in-Sports-Coaching only, Discipline) plus the applicant's uploaded `PHOTO` document onto one of 4 course-specific template PDFs (`assets/admit-card-templates/{BSS,BSJ,BSM,DSC}.pdf`) via `pdf-lib`. Field coordinates are hand-measured per template (`UG_LAYOUT`/`DSC_LAYOUT` constants) — the 3 UG templates share one layout, DSC has its own (different field arrangement and photo-box size). 404s until `Student.rollNumber` is set. Exposed via `GET /admissions/me/admit-card` (student) and `GET /admissions/:id/admit-card` (staff/admin).
 
 ## Admission fee
 

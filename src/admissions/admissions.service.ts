@@ -5,10 +5,12 @@ import { PrismaService } from "../prisma/prisma.service";
 import { PaymentsService } from "../payments/payments.service";
 import { StudentsService } from "../students/students.service";
 import { UkssuService } from "../ukssu/ukssu.service";
+import { RollNumberService } from "../ukssu/roll-number.service";
 import { StorageService } from "../storage/storage.service";
 import { MailService } from "../mail/mail.service";
 import type { AdmissionStatus } from "@prisma/client";
 import type { CreateBatchDto } from "./dto/create-batch.dto";
+import type { UpdateBatchExamDetailsDto } from "./dto/update-batch-exam-details.dto";
 import type { PatchDraftAdmissionDto } from "./dto/patch-draft-admission.dto";
 
 const ALLOWED_DOCUMENT_MIME_TYPES = new Set(["application/pdf", "image/jpeg", "image/png"]);
@@ -46,6 +48,7 @@ export class AdmissionsService {
     private prisma: PrismaService,
     private students: StudentsService,
     private ukssu: UkssuService,
+    private rollNumbers: RollNumberService,
     private payments: PaymentsService,
     private config: ConfigService,
     private storage: StorageService,
@@ -134,6 +137,22 @@ export class AdmissionsService {
     if (!batch) throw new NotFoundException("Batch not found");
     if (!batch.isActive) throw new ConflictException("This batch is not currently active");
     return this.prisma.admissionBatch.update({ where: { id }, data: { isActive: false } });
+  }
+
+  // Entrance exam reporting details for the admit card — settable any time
+  // after a batch exists, independent of whether it's still active.
+  async updateBatchExamDetails(id: string, dto: UpdateBatchExamDetailsDto) {
+    const batch = await this.prisma.admissionBatch.findUnique({ where: { id } });
+    if (!batch) throw new NotFoundException("Batch not found");
+    return this.prisma.admissionBatch.update({
+      where: { id },
+      data: {
+        ...(dto.examDate !== undefined ? { examDate: new Date(dto.examDate) } : {}),
+        ...(dto.reportingTime !== undefined ? { reportingTime: dto.reportingTime } : {}),
+        ...(dto.examCentreName !== undefined ? { examCentreName: dto.examCentreName } : {}),
+        ...(dto.examCentreAddress !== undefined ? { examCentreAddress: dto.examCentreAddress } : {}),
+      },
+    });
   }
 
   // --- Draft admission (dashboard 5-step form) ------------------------
@@ -350,7 +369,21 @@ export class AdmissionsService {
         where: { id: admission.studentId },
         include: { user: { select: { email: true, fullName: true, registrationNumber: true } } },
       });
-      return student ? { user: student.user, amount } : null;
+      if (!student) return null;
+
+      // Roll number is assigned the moment an admission is submitted+paid —
+      // not on staff approval (that's ukssuId, see updateStatus above).
+      // Guarded on rollNumber being unset so a retried/duplicate webhook
+      // delivery never reassigns/overwrites one.
+      if (!student.rollNumber && student.programme) {
+        const course = await tx.course.findUnique({ where: { name: student.programme } });
+        if (course?.code) {
+          const rollNumber = await this.rollNumbers.nextRollNumber(tx, course.code);
+          await tx.student.update({ where: { id: student.id }, data: { rollNumber } });
+        }
+      }
+
+      return { user: student.user, amount };
     });
 
     // Sent outside the transaction so a slow/failed email can never hold the

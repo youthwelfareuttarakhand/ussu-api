@@ -87,6 +87,10 @@ model Course {
   id        String         @id @default(cuid())
   name      String         @unique
   level     ProgrammeLevel
+  // Short form used in the roll number (e.g. "BSM") and on the admit card's
+  // "Course Code" field (rendered as "{code}-26", two-digit year). Nullable
+  // so future courses can be added before someone assigns a code.
+  code      String?        @unique
   createdAt DateTime       @default(now())
 }
 
@@ -163,6 +167,14 @@ model AdmissionBatch {
   isActive   Boolean     @default(false)
   startedAt  DateTime    @default(now())
   admissions Admission[]
+
+  // Entrance exam reporting details shown on the admit card. Nullable/settable
+  // by staff after creating a batch — a batch can exist before the exam is
+  // scheduled.
+  examDate          DateTime?
+  reportingTime     String?
+  examCentreName    String?
+  examCentreAddress String?
 }
 
 // Created as a DRAFT the moment an applicant starts the dashboard admission
@@ -348,6 +360,17 @@ model UkssuIdCounter {
 model RegistrationNumberCounter {
   year  Int @id
   value Int @default(0)
+}
+
+// Atomic per-(year, courseCode) sequence source for roll numbers. Assigned
+// the moment an admission becomes submitted+paid (AdmissionsService,
+// markPaidByOrderId) — same atomic-increment pattern as UkssuIdCounter.
+model RollNumberCounter {
+  year       Int
+  courseCode String
+  value      Int    @default(0)
+
+  @@id([year, courseCode])
 }
 
 // One row per /contact form submission on ussu-web (ContactController.create).
