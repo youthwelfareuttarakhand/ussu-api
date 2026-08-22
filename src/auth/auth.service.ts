@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import * as bcrypt from "bcrypt";
+import { createHash } from "node:crypto";
 import type { Response } from "express";
 import { UsersService } from "../users/users.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -42,7 +43,13 @@ export class AuthService {
       expiresIn: this.config.get<string>("jwt.refreshExpiry"),
     });
 
-    const tokenHash = await bcrypt.hash(refreshToken, 10);
+    // SHA-256, not bcrypt — this just needs to keep the raw token out of the
+    // DB (in case it leaks), not resist brute-forcing like a password hash
+    // does. The token itself is already a high-entropy signed JWT, and this
+    // hash isn't compared against on refresh yet (see the ponytail note
+    // below) — bcrypt's deliberate slowness here was pure latency on every
+    // login and every silent refresh for no security benefit.
+    const tokenHash = createHash("sha256").update(refreshToken).digest("hex");
     await this.prisma.refreshToken.create({
       data: {
         userId: user.id,

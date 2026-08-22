@@ -231,6 +231,10 @@ model Admission {
   academicDetails AcademicDetails?
   sportsDetails   SportsDetails?
   documents       Document[]
+
+  // Backs the staff Admissions Queue's `where: paid + orderBy: submittedAt`
+  // query, now paginated server-side (AdmissionsService.findAll).
+  @@index([paid, submittedAt])
 }
 
 model ParentDetails {

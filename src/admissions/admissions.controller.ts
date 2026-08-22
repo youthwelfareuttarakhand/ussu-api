@@ -27,6 +27,7 @@ import { CurrentUser } from "../common/decorators/current-user.decorator";
 import type { AuthUser } from "../auth/strategies/jwt.strategy";
 import { PaymentsService } from "../payments/payments.service";
 import { AdmissionsService } from "./admissions.service";
+import { PaginatedListQueryDto } from "../common/dto/paginated-list-query.dto";
 import { AdmitCardService } from "./admit-card.service";
 import { CreateBatchDto } from "./dto/create-batch.dto";
 import { UpdateBatchExamDetailsDto } from "./dto/update-batch-exam-details.dto";
@@ -47,8 +48,8 @@ export class AdmissionsController {
 
   @Get()
   @Roles(Role.STAFF, Role.ADMIN)
-  findAll() {
-    return this.admissions.findAll();
+  findAll(@Query() query: PaginatedListQueryDto) {
+    return this.admissions.findAll(query);
   }
 
   @Get("me")

@@ -102,6 +102,8 @@ Created as a **draft** the moment an applicant first opens the dashboard admissi
 | `amountPaid` | `Int?` | — | Admission fee in paise, snapshotted at payment time (category-dependent — see [fee](#admission-fee)). |
 | `paidAt` | `DateTime?` | — | |
 | `submittedAt` | `DateTime` | default `now()` | Draft-creation time, despite the name — kept for backward compatibility with existing staff-list sorting. |
+
+Indexed on `[paid, submittedAt]` — backs the staff Admissions Queue's `where: paid + orderBy: submittedAt` query (`AdmissionsService.findAll`, paginated server-side via `PaginatedListQueryDto`).
 | `reviewedAt` / `reviewedBy` | `DateTime?` / `String?` | — | Set by staff/admin on status change (`PATCH /admissions/:id/status`). |
 
 Relations: `parentDetails ParentDetails?`, `addressDetails AddressDetails?`, `academicDetails AcademicDetails?`, `sportsDetails SportsDetails?` (each 1:1, one per admission form step), `documents Document[]`.

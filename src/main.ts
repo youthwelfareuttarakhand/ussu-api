@@ -2,6 +2,7 @@ import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import cookieParser from "cookie-parser";
+import compression from "compression";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
@@ -11,6 +12,7 @@ async function bootstrap() {
   const config = app.get(ConfigService);
 
   app.use(cookieParser());
+  app.use(compression());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.enableCors({
     origin: config.get<string[]>("corsOrigins"),

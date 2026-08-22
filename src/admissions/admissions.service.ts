@@ -8,7 +8,8 @@ import { UkssuService } from "../ukssu/ukssu.service";
 import { RollNumberService } from "../ukssu/roll-number.service";
 import { StorageService } from "../storage/storage.service";
 import { MailService } from "../mail/mail.service";
-import type { AdmissionStatus } from "@prisma/client";
+import type { AdmissionStatus, Prisma } from "@prisma/client";
+import type { PaginatedListQueryDto, PaginatedResult } from "../common/dto/paginated-list-query.dto";
 import type { CreateBatchDto } from "./dto/create-batch.dto";
 import type { UpdateBatchExamDetailsDto } from "./dto/update-batch-exam-details.dto";
 import type { PatchDraftAdmissionDto } from "./dto/patch-draft-admission.dto";
@@ -57,12 +58,29 @@ export class AdmissionsService {
 
   // Staff queue only shows completed, paid applications — unpaid drafts
   // (applicant started the form but never finished/paid) are noise for staff.
-  findAll() {
-    return this.prisma.admission.findMany({
-      where: { paid: true },
-      orderBy: { submittedAt: "desc" },
-      include: draftInclude,
-    });
+  // Paginated (and course/gender/discipline-filterable) server-side — this
+  // used to fetch every paid admission, unbounded, with a 6-table join per
+  // row, on every single queue page load. `all: true` (Export to Excel)
+  // still fetches the complete filtered set, just not by default.
+  async findAll(query: PaginatedListQueryDto): Promise<PaginatedResult<Prisma.AdmissionGetPayload<{ include: typeof draftInclude }>>> {
+    const where: Prisma.AdmissionWhereInput = {
+      paid: true,
+      ...(query.course ? { student: { programme: query.course } } : {}),
+      ...(query.gender ? { gender: query.gender } : {}),
+      ...(query.discipline ? { coachingDiscipline: query.discipline } : {}),
+    };
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const [data, total] = await Promise.all([
+      this.prisma.admission.findMany({
+        where,
+        orderBy: { submittedAt: "desc" },
+        include: draftInclude,
+        ...(query.all ? {} : { skip: (page - 1) * limit, take: limit }),
+      }),
+      this.prisma.admission.count({ where }),
+    ]);
+    return { data, total };
   }
 
   // Staff-facing single-admission detail view (the full form a student
