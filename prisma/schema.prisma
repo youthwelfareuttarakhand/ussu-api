@@ -327,11 +327,15 @@ model Document {
 }
 
 model Notice {
-  id        String   @id @default(cuid())
-  title     String
-  body      String
-  postedBy  String
-  createdAt DateTime @default(now())
+  id                 String   @id @default(cuid())
+  title              String
+  body               String
+  postedBy           String
+  createdAt          DateTime @default(now())
+  attachmentFilename String?
+  attachmentUrl      String?
+  attachmentData     Bytes?
+  attachmentMimeType String?
 }
 
 // Stores a hash, not the raw refresh token — a raw token in the DB would let

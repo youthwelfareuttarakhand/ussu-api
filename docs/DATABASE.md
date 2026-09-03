@@ -134,7 +134,7 @@ One row per `(admissionId, type)` in practice — `AdmissionsService.uploadDocum
 **Storage backend** (`src/storage/storage.service.ts`): decided per-request by which env vars are set. Production `ussu-api` has `AZURE_STORAGE_CONNECTION_STRING`/`AZURE_STORAGE_CONTAINER` configured (Azure Blob Storage, private container). Staging/local dev deliberately leave these unset — `StorageService` then falls back to storing raw bytes directly on the `Document` row (`data`+`mimeType`), so applicant documents from testing can never land in the real prod storage account and no external service is needed for local development. `POST /admissions/draft/documents` (multipart, 5MB file size cap) and `DELETE /admissions/draft/documents/:id` are the only entry points.
 
 ### `Notice`
-Simple announcements list (title/body), unrelated to the admissions flow.
+Announcements list (title/body), unrelated to the admissions flow. Optional attachment (PDF/image) mirrors `Document`'s storage pattern: `attachmentUrl` when stored in Azure Blob, `attachmentData`/`attachmentMimeType` when stored inline (dev/staging without Azure creds). Exactly one of the two pairs is set per row.
 
 ### `RefreshToken`
 | Column | Type | Meaning |
