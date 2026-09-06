@@ -36,6 +36,12 @@ export class PaginatedListQueryDto {
   @IsOptional()
   @IsString()
   discipline?: string;
+
+  // Students list only — derived at query time from FeeStructure/FeePayment,
+  // not a stored column. See StudentsService.findAll.
+  @IsOptional()
+  @IsString()
+  feeStatus?: string;
 }
 
 export type PaginatedResult<T> = { data: T[]; total: number };
