@@ -18,6 +18,14 @@ function last7Days(): { start: Date; end: Date; label: string }[] {
   return days;
 }
 
+// Fills in a 7-day trend from one grouped SQL query's rows instead of one
+// count() query per day (was 7 separate round trips per trend, 14 total
+// across overview()+visitors() on a single admin dashboard load).
+function fillTrend(days: { start: Date; label: string }[], rows: { day: Date; count: bigint }[]) {
+  const countByDay = new Map(rows.map((r) => [r.day.toISOString().slice(0, 10), Number(r.count)]));
+  return days.map(({ start, label }) => ({ day: label, count: countByDay.get(start.toISOString().slice(0, 10)) ?? 0 }));
+}
+
 @Injectable()
 export class AnalyticsService {
   constructor(private prisma: PrismaService) {}
@@ -38,12 +46,13 @@ export class AnalyticsService {
     const pendingAdmissions = totalRegistrations - admissionsCompleted;
 
     const days = last7Days();
-    const registrationTrend = await Promise.all(
-      days.map(async ({ start, end, label }) => ({
-        day: label,
-        count: await this.prisma.student.count({ where: { user: { createdAt: { gte: start, lt: end } } } }),
-      })),
-    );
+    const rows = await this.prisma.$queryRaw<{ day: Date; count: bigint }[]>`
+      SELECT date_trunc('day', "createdAt") as day, count(*)::bigint as count
+      FROM "User"
+      WHERE role = 'STUDENT' AND "createdAt" >= ${days[0].start}
+      GROUP BY date_trunc('day', "createdAt")
+    `;
+    const registrationTrend = fillTrend(days, rows);
 
     return { totalRegistrations, admissionsCompleted, pendingAdmissions, totalStudents, totalStaff, registrationTrend };
   }
@@ -62,12 +71,13 @@ export class AnalyticsService {
     ]);
 
     const days = last7Days();
-    const trend = await Promise.all(
-      days.map(async ({ start, end, label }) => ({
-        day: label,
-        count: await this.uniqueIpCount({ createdAt: { gte: start, lt: end } }),
-      })),
-    );
+    const rows = await this.prisma.$queryRaw<{ day: Date; count: bigint }[]>`
+      SELECT date_trunc('day', "createdAt") as day, count(DISTINCT ip)::bigint as count
+      FROM "PageVisit"
+      WHERE "createdAt" >= ${days[0].start}
+      GROUP BY date_trunc('day', "createdAt")
+    `;
+    const trend = fillTrend(days, rows);
 
     return { totalUnique, last7Days: last7Days_, thisMonth, thisYear, trend };
   }

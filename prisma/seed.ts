@@ -116,6 +116,41 @@ async function main() {
     ),
   );
 
+  // Official prospectus rates, 2026-27: UG courses are billed per semester,
+  // the Diploma per year.
+  const feeStructuresByCourse: Record<string, { label: string; cadence: "YEAR" | "SEMESTER"; amountPaise: number; mandatory: boolean; requiresHostelOptIn: boolean }[]> = {
+    "Bachelor of Sports Science": [
+      { label: "Tuition Fee", cadence: "SEMESTER", amountPaise: 2870000, mandatory: true, requiresHostelOptIn: false },
+      { label: "Hostel Fee", cadence: "SEMESTER", amountPaise: 550000, mandatory: false, requiresHostelOptIn: true },
+    ],
+    "Bachelor of Sports Management": [
+      { label: "Tuition Fee", cadence: "SEMESTER", amountPaise: 2870000, mandatory: true, requiresHostelOptIn: false },
+      { label: "Hostel Fee", cadence: "SEMESTER", amountPaise: 550000, mandatory: false, requiresHostelOptIn: true },
+    ],
+    "Bachelor of Sports Journalism": [
+      { label: "Tuition Fee", cadence: "SEMESTER", amountPaise: 2870000, mandatory: true, requiresHostelOptIn: false },
+      { label: "Hostel Fee", cadence: "SEMESTER", amountPaise: 550000, mandatory: false, requiresHostelOptIn: true },
+    ],
+    "Diploma in Sports Coaching": [
+      { label: "Tuition Fee", cadence: "YEAR", amountPaise: 4510000, mandatory: true, requiresHostelOptIn: false },
+      { label: "Hostel Fee", cadence: "YEAR", amountPaise: 1400000, mandatory: false, requiresHostelOptIn: true },
+    ],
+  };
+
+  for (const [courseName, fees] of Object.entries(feeStructuresByCourse)) {
+    const course = await prisma.course.findUnique({ where: { name: courseName } });
+    if (!course) continue;
+    await Promise.all(
+      fees.map((fee) =>
+        prisma.feeStructure.upsert({
+          where: { courseId_label: { courseId: course.id, label: fee.label } },
+          update: { cadence: fee.cadence, amountPaise: fee.amountPaise, mandatory: fee.mandatory, requiresHostelOptIn: fee.requiresHostelOptIn },
+          create: { courseId: course.id, ...fee },
+        }),
+      ),
+    );
+  }
+
   await prisma.notice.createMany({
     data: [
       { title: "Admissions open for 2026-27", body: "Applications for all programmes are now open.", postedBy: admin.email },

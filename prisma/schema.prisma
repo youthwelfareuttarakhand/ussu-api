@@ -1,6 +1,12 @@
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  provider        = "prisma-client-js"
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
+  // Turns nested `include`s (Admission's parentDetails/addressDetails/
+  // academicDetails/sportsDetails/documents/etc.) into a single SQL JOIN
+  // instead of one round trip per relation. Measured 10 separate queries
+  // (~1.6s) for one admission fetch without this — a major contributor to
+  // slow page loads on every environment, not just an infra issue.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -90,8 +96,60 @@ model Course {
   // Short form used in the roll number (e.g. "BSM") and on the admit card's
   // "Course Code" field (rendered as "{code}-26", two-digit year). Nullable
   // so future courses can be added before someone assigns a code.
-  code      String?        @unique
-  createdAt DateTime       @default(now())
+  code          String?        @unique
+  createdAt     DateTime       @default(now())
+  students      Student[]
+  feeStructures FeeStructure[]
+}
+
+enum FeeCadence {
+  SEMESTER
+  YEAR
+}
+
+// One row per chargeable fee line item for a course (e.g. Tuition, Hostel).
+// Amounts live here, not in code, so adding a course's fee schedule later is
+// a seed-data change, not a code change.
+model FeeStructure {
+  id          String       @id @default(cuid())
+  courseId    String
+  course      Course       @relation(fields: [courseId], references: [id])
+  label       String
+  cadence     FeeCadence
+  amountPaise Int
+  mandatory   Boolean      @default(true)
+  // When true, `mandatory` above is only a fallback default — the effective
+  // mandatory-ness for a given student is instead whether they answered yes
+  // to Admission.hostelRequired (see FeesService.getMine).
+  requiresHostelOptIn Boolean @default(false)
+  createdAt   DateTime     @default(now())
+  payments    FeePayment[]
+
+  @@unique([courseId, label])
+}
+
+// One row per student per fee cycle they've been charged for. cycleLabel is
+// currently just "Year 1"/"Semester 1" (first cycle) since there's no real
+// semester-progression tracker yet — see FeesService for the derivation.
+model FeePayment {
+  id                String       @id @default(cuid())
+  studentId         String
+  student           Student      @relation(fields: [studentId], references: [id])
+  feeStructureId    String
+  feeStructure      FeeStructure @relation(fields: [feeStructureId], references: [id])
+  cycleLabel        String
+  amountPaise       Int
+  paid              Boolean      @default(false)
+  // Not unique: a single combined checkout (course fee + hostel fee paid
+  // together) creates one Razorpay order shared across multiple FeePayment
+  // rows — see FeesService.payAll.
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  paidAt            DateTime?
+  createdAt         DateTime     @default(now())
+
+  @@unique([studentId, feeStructureId, cycleLabel])
+  @@index([razorpayOrderId])
 }
 
 model User {
@@ -133,6 +191,14 @@ model Student {
   user           User            @relation(fields: [userId], references: [id])
   rollNumber     String?         @unique
   programme      String?
+  // FK counterpart to `programme` above (which only ever held the resolved
+  // course name as a string). Set alongside `programme`/`programmeLevel` in
+  // AdmissionsService.patchDraft. Nullable: existing rows are backfilled by
+  // matching `programme` to Course.name where possible, left null otherwise
+  // (no course fee structure applies until this is set).
+  courseId       String?
+  course         Course?         @relation(fields: [courseId], references: [id])
+  feePayments    FeePayment[]
   // Set at registration time (ApplicationsService.create) — applicant-level
   // data known before the Admission row even exists (Admission is created
   // later, when the applicant starts the dashboard admission form). State is

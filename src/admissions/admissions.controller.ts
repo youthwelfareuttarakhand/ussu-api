@@ -26,6 +26,7 @@ import { RolesGuard } from "../common/guards/roles.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import type { AuthUser } from "../auth/strategies/jwt.strategy";
 import { PaymentsService } from "../payments/payments.service";
+import { FeesService } from "../fees/fees.service";
 import { AdmissionsService } from "./admissions.service";
 import { PaginatedListQueryDto } from "../common/dto/paginated-list-query.dto";
 import { AdmitCardService } from "./admit-card.service";
@@ -56,6 +57,14 @@ export class AdmissionsController {
   @Roles(Role.STUDENT)
   findMine(@CurrentUser() user: AuthUser) {
     return this.admissions.findForUser(user.sub);
+  }
+
+  // Lightweight version of /me for the portal's per-navigation access gate —
+  // see AdmissionsService.findStatusForUser.
+  @Get("me/status")
+  @Roles(Role.STUDENT)
+  findMineStatus(@CurrentUser() user: AuthUser) {
+    return this.admissions.findStatusForUser(user.sub);
   }
 
   @Patch(":id/status")
@@ -195,6 +204,7 @@ export class PaymentsWebhookController {
   constructor(
     private payments: PaymentsService,
     private admissions: AdmissionsService,
+    private fees: FeesService,
   ) {}
 
   @Post("razorpay")
@@ -209,7 +219,10 @@ export class PaymentsWebhookController {
     if (event?.event === "payment.captured") {
       const payment = event.payload?.payment?.entity;
       if (payment?.order_id && payment?.id) {
+        // Neither call knows which table the order belongs to — each is a
+        // no-op on an orderId it doesn't recognize, so calling both is safe.
         await this.admissions.handlePaymentCaptured(payment.order_id, payment.id);
+        await this.fees.handlePaymentCaptured(payment.order_id, payment.id);
       }
     }
 

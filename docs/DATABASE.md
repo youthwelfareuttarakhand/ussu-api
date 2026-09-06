@@ -22,6 +22,9 @@ Stack: PostgreSQL + Prisma. One migration baseline (`20260706090425_init`) plus 
 ### `ProgrammeLevel`
 `UG | PG | DIPLOMA` — the three top-level categories of programme USSU offers. Used on `Course.level`.
 
+### `FeeCadence`
+`SEMESTER | YEAR` — how often a `FeeStructure` row is billed. UG courses bill per semester, the Diploma per year.
+
 ## Tables
 
 ### `User`
@@ -51,11 +54,12 @@ Student-specific fields, 1:1 with a `User` where `role = STUDENT`.
 | `userId` | `String` | unique, FK → `User.id` | |
 | `rollNumber` | `String?` | unique (nullable) | The official university roll number — distinct from `ukssuId`. Auto-assigned the moment the student's admission becomes submitted+paid — see [Roll Number](#roll-number) below. |
 | `programme` | `String?` | — | Free-text description of the student's declared programme (e.g. `"B.Sc. Sports Science"`). `NULL` until the applicant picks a course in the dashboard admission form's step 1 (`AdmissionsService`, set to the matching `Course.name`). |
+| `courseId` | `String?` | FK → `Course.id` | Set alongside `programme`/`programmeLevel` in `AdmissionsService.patchDraft`. Nullable: existing rows are backfilled by matching `programme` to `Course.name` where possible, left `NULL` otherwise — a `NULL` `courseId` means no course fee structure applies to this student. |
 | `countryId` | `String?` | FK → `Country.id` | Set at registration time (`ApplicationsService.create`). Known before the `Admission` row even exists — `Admission` is only created later, when the applicant starts the dashboard admission form. |
 | `stateId` | `String?` | FK → `State.id` | Only set when `country` is India (enforced by the frontend hiding the State field otherwise). |
 | `programmeLevel` | `ProgrammeLevel?` | — | The UG/PG/Diploma level for `programme` above, set alongside it. |
 
-Relations: `user User`, `admission Admission?`, `country Country?`, `state State?`.
+Relations: `user User`, `admission Admission?`, `country Country?`, `state State?`, `course Course?`, `feePayments FeePayment[]`.
 
 ### `Staff`
 Staff-specific fields, 1:1 with a `User` where `role = STAFF`.
@@ -174,6 +178,40 @@ Concrete courses offered under each `ProgrammeLevel`. Grows over time — new co
 | `code` | `String?` | unique (nullable) | Short form used in the roll number and the admit card's "Course Code" field (e.g. `"BSM"`, rendered as `"BSM-26"`). Nullable so a course can be added before someone assigns it a code. |
 
 Seeded via `prisma/seed.ts` — currently 3 UG courses (`BSS` B.Sc. Sports Science, `BSM` B.Sc. Sports Management, `BSJ` B.Sc. Sports Journalism) and 1 Diploma course (`DSC` Diploma in Sports Coaching). No PG courses exist yet.
+
+Relations: `students Student[]`, `feeStructures FeeStructure[]`.
+
+### `FeeStructure`
+One row per chargeable fee line item for a course (e.g. Tuition, Hostel) — amounts live here, not in code, so adding a course's fee schedule is a seed-data change, not a code change.
+
+| Column | Type | Constraints | Meaning |
+|---|---|---|---|
+| `id` | `String` | PK, `cuid()` | |
+| `courseId` | `String` | FK → `Course.id` | |
+| `label` | `String` | unique with `courseId` | e.g. `"Tuition Fee"`, `"Hostel Fee"`. |
+| `cadence` | `FeeCadence` | — | `SEMESTER` or `YEAR` — UG courses bill per semester, the Diploma per year. |
+| `amountPaise` | `Int` | — | |
+| `mandatory` | `Boolean` | default `true` | Static default. For a row with `requiresHostelOptIn = true`, the *effective* mandatory-ness is computed per student instead (see below) — this default is only the fallback. |
+| `requiresHostelOptIn` | `Boolean` | default `false` | When true, whether this fee is mandatory for a given student follows their own `Admission.hostelRequired` answer, not the static `mandatory` default (`FeesService.getMine`). |
+
+Relations: `course Course`, `payments FeePayment[]`.
+
+### `FeePayment`
+One row per student per fee cycle they've been charged for.
+
+| Column | Type | Constraints | Meaning |
+|---|---|---|---|
+| `id` | `String` | PK, `cuid()` | |
+| `studentId` | `String` | FK → `Student.id` | |
+| `feeStructureId` | `String` | FK → `FeeStructure.id` | |
+| `cycleLabel` | `String` | unique with `studentId`+`feeStructureId` | e.g. `"Year 1"`, `"Semester 1"`. Currently always the first cycle — no semester-progression tracker exists yet, so a student is only ever billed once per fee line item (`FeesService.firstCycleLabel`). Revisit once real enrollment-year tracking exists. |
+| `amountPaise` | `Int` | — | |
+| `paid` | `Boolean` | default `false` | |
+| `razorpayOrderId` | `String?` | not unique | A combined checkout (course fee + hostel fee paid together) creates one Razorpay order shared across multiple `FeePayment` rows, so this is intentionally not unique per row (unlike `Admission.razorpayOrderId`). Indexed for webhook lookup. |
+| `razorpayPaymentId` | `String?` | — | |
+| `paidAt` | `DateTime?` | — | |
+
+Relations: `student Student`, `feeStructure FeeStructure`.
 
 ### `UkssuIdCounter`
 The atomic sequence source for generating UKSSU IDs.

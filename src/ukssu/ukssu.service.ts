@@ -26,8 +26,17 @@ export class UkssuService {
       value = row.value;
     } catch {
       // First-ever signup for this (year, roleCode) pair — no row yet.
+      // Seed the counter above any ukssuId already assigned outside this
+      // counter (e.g. seed data), so we don't reissue a taken id.
+      const prefix = `UKSSU-${year}-${roleCode}-`;
+      const existing = await tx.user.findFirst({
+        where: { ukssuId: { startsWith: prefix } },
+        orderBy: { ukssuId: "desc" },
+        select: { ukssuId: true },
+      });
+      const seedValue = existing ? Number(existing.ukssuId!.slice(prefix.length)) + 1 : 1;
       try {
-        const row = await tx.ukssuIdCounter.create({ data: { year, roleCode, value: 1 } });
+        const row = await tx.ukssuIdCounter.create({ data: { year, roleCode, value: seedValue } });
         value = row.value;
       } catch {
         // Lost the race to create the first row — someone else beat us to it.
