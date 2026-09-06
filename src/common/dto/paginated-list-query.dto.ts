@@ -42,6 +42,11 @@ export class PaginatedListQueryDto {
   @IsOptional()
   @IsString()
   feeStatus?: string;
+
+  // Free-text search against applicant name/email/roll number.
+  @IsOptional()
+  @IsString()
+  search?: string;
 }
 
 export type PaginatedResult<T> = { data: T[]; total: number };

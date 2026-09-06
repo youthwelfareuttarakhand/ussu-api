@@ -72,9 +72,20 @@ export class AdmissionsService {
   async findAll(query: PaginatedListQueryDto): Promise<PaginatedResult<Prisma.AdmissionGetPayload<{ include: typeof draftInclude }>>> {
     const where: Prisma.AdmissionWhereInput = {
       paid: true,
-      ...(query.course ? { student: { programme: query.course } } : {}),
       ...(query.gender ? { gender: query.gender } : {}),
       ...(query.discipline ? { coachingDiscipline: query.discipline } : {}),
+      student: {
+        ...(query.course ? { programme: query.course } : {}),
+        ...(query.search
+          ? {
+              OR: [
+                { user: { fullName: { contains: query.search, mode: "insensitive" } } },
+                { user: { email: { contains: query.search, mode: "insensitive" } } },
+                { rollNumber: { contains: query.search, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      },
     };
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;

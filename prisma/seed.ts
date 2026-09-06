@@ -21,7 +21,7 @@ const prisma = new PrismaClient();
 async function main() {
   const passwordHash = await bcrypt.hash("password123", 10);
 
-  const admin = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: "admin@ukssu.ac.in" },
     update: { fullName: "USSU Administrator", ukssuId: "UKSSU-2026-ADM-000001" },
     create: {
@@ -33,7 +33,7 @@ async function main() {
     },
   });
 
-  const staffUser = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: "staff@ukssu.ac.in" },
     update: { fullName: "Admissions Officer", ukssuId: "UKSSU-2026-STF-000001" },
     create: {
@@ -151,20 +151,12 @@ async function main() {
     );
   }
 
-  await prisma.notice.createMany({
-    data: [
-      { title: "Admissions open for 2026-27", body: "Applications for all programmes are now open.", postedBy: admin.email },
-      { title: "Sports Conclave 2026 highlights", body: "Photos and results from the recent conclave are now live.", postedBy: staffUser.email },
-    ],
-    skipDuplicates: true,
-  });
-
   await prisma.religion.createMany({
     data: RELIGIONS.map((name) => ({ name })),
     skipDuplicates: true,
   });
 
-  console.log("Seeded admin, staff, student users, sample notices, countries, India's states, and religions.");
+  console.log("Seeded admin, staff, student users, countries, India's states, and religions.");
 }
 
 main()
