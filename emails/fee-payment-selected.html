@@ -1,0 +1,126 @@
+<!--
+  Resend template  ·  slug: fee-payment-selected
+  Sent by: prisma/notify-selected-fee-payment.ts (transactional, per student)
+
+  This file is the source of truth. To deploy: copy it into a new Resend
+  dashboard template, set the slug to "fee-payment-selected", paste the logo
+  <img src> from the existing "admission-fee-confirmation" template into the
+  header (marked below), then PUBLISH it. Unpublished templates fail silently
+  (Resend returns result.error, does not throw).
+
+  Handlebars variables (all strings, passed flat by the script):
+    fullName    e.g. "Aarav Sharma"
+    ukssuId     e.g. "UKSSU-2026-STU-000066"
+    courseName  e.g. "Bachelor of Sports Science"
+    feeTerm     "first semester" | "first year"
+    username    the student's email (portal login identifier)
+    portalUrl   "https://portal.ukssu.ac.in"
+    ctaUrl      "https://portal.ukssu.ac.in/login"
+    dueDate     "11 September 2026"
+-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F8F6F1" style="background-color:#F8F6F1;margin:0;padding:0;">
+  <tr>
+    <td align="center" style="padding:24px 12px;">
+
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;">
+
+        <!-- Header band -->
+        <tr>
+          <td align="center" bgcolor="#0A1E42" style="background-color:#0A1E42;border-radius:12px 12px 0 0;padding:28px 24px 22px;">
+            <!-- LOGO: paste the <img src="..."> value from the admission-fee-confirmation template here. Keep width ~48 and style="display:block". Delete this comment line after. -->
+            <img src="https://REPLACE-WITH-LOGO-URL/logo-on-navy.png" width="48" height="48" alt="Uttarakhand State Sports University" style="display:block;border:0;outline:none;text-decoration:none;margin:0 auto 10px;" />
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:20px;font-weight:700;letter-spacing:0.06em;color:#FFFFFF;text-transform:uppercase;">
+              Uttarakhand State Sports University
+            </div>
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;line-height:16px;color:#AEB8CC;margin-top:3px;">
+              Haldwani, Nainital
+            </div>
+          </td>
+        </tr>
+
+        <!-- Green keyline -->
+        <tr>
+          <td bgcolor="#1E8E5A" style="background-color:#1E8E5A;font-size:0;line-height:0;height:4px;">&nbsp;</td>
+        </tr>
+
+        <!-- Body card -->
+        <tr>
+          <td bgcolor="#FFFFFF" style="background-color:#FFFFFF;border-radius:0 0 12px 12px;padding:32px 32px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+
+            <h1 style="margin:0 0 16px;font-size:20px;line-height:28px;font-weight:700;color:#1A1A1A;">
+              Congratulations, {{{fullName}}} &mdash; your admission is confirmed.
+            </h1>
+
+            <p style="margin:0 0 14px;font-size:15px;line-height:23px;color:#1A1A1A;">
+              You have been admitted to <strong>Uttarakhand State Sports University</strong> for the
+              course below. Your seat is secured &mdash; no further confirmation is needed.
+            </p>
+
+            <p style="margin:0 0 22px;font-size:15px;line-height:23px;color:#1A1A1A;">
+              The next step is to pay your <strong>{{{feeTerm}}} course fee</strong> on the student
+              portal. Please complete the payment by <strong>{{{dueDate}}}</strong>.
+            </p>
+
+            <!-- Detail table -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E5E2D9;border-radius:10px;border-collapse:separate;overflow:hidden;margin-bottom:24px;">
+              <tr>
+                <td width="120" style="padding:11px 14px;font-size:12px;line-height:16px;color:#5B6472;text-transform:uppercase;letter-spacing:0.04em;background-color:#FAF9F5;border-bottom:1px solid #E5E2D9;">Course</td>
+                <td style="padding:11px 14px;font-size:14px;line-height:18px;color:#1A1A1A;font-weight:600;border-bottom:1px solid #E5E2D9;">{{{courseName}}}</td>
+              </tr>
+              <tr>
+                <td style="padding:11px 14px;font-size:12px;line-height:16px;color:#5B6472;text-transform:uppercase;letter-spacing:0.04em;background-color:#FAF9F5;border-bottom:1px solid #E5E2D9;">UKSSU ID</td>
+                <td style="padding:11px 14px;font-size:14px;line-height:18px;color:#1A1A1A;font-weight:600;border-bottom:1px solid #E5E2D9;">{{{ukssuId}}}</td>
+              </tr>
+              <tr>
+                <td style="padding:11px 14px;font-size:12px;line-height:16px;color:#5B6472;text-transform:uppercase;letter-spacing:0.04em;background-color:#FAF9F5;border-bottom:1px solid #E5E2D9;">Portal</td>
+                <td style="padding:11px 14px;font-size:14px;line-height:18px;color:#1A1A1A;border-bottom:1px solid #E5E2D9;"><a href="{{{portalUrl}}}" style="color:#0A1E42;font-weight:600;text-decoration:none;">{{{portalUrl}}}</a></td>
+              </tr>
+              <tr>
+                <td style="padding:11px 14px;font-size:12px;line-height:16px;color:#5B6472;text-transform:uppercase;letter-spacing:0.04em;background-color:#FAF9F5;border-bottom:1px solid #E5E2D9;">Username</td>
+                <td style="padding:11px 14px;font-size:14px;line-height:18px;color:#1A1A1A;font-weight:600;border-bottom:1px solid #E5E2D9;">{{{username}}}</td>
+              </tr>
+              <tr>
+                <td style="padding:11px 14px;font-size:12px;line-height:16px;color:#5B6472;text-transform:uppercase;letter-spacing:0.04em;background-color:#FAF9F5;">Password</td>
+                <td style="padding:11px 14px;font-size:14px;line-height:19px;color:#1A1A1A;">
+                  The password you set when you registered on ukssu.ac.in.
+                  <span style="color:#5B6472;">Forgot it? Use &ldquo;Forgot password&rdquo; on the ukssu.ac.in sign-in screen &mdash; you&rsquo;ll confirm your full name and date of birth.</span>
+                </td>
+              </tr>
+            </table>
+
+            <!-- CTA button -->
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 12px;">
+              <tr>
+                <td align="center" bgcolor="#1E8E5A" style="background-color:#1E8E5A;border-radius:8px;">
+                  <a href="{{{ctaUrl}}}" style="display:inline-block;padding:13px 30px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;line-height:18px;color:#FFFFFF;text-decoration:none;">
+                    Open the Student Portal
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0 0 4px;font-size:13px;line-height:20px;color:#5B6472;text-align:center;">
+              After signing in, go to <strong style="color:#1A1A1A;">Fees &rarr; Fee Submission</strong> to see the amount and pay.
+            </p>
+            <p style="margin:0;font-size:12px;line-height:18px;color:#8A8A8A;text-align:center;">
+              Button not working? Paste this into your browser: {{{ctaUrl}}}
+            </p>
+
+          </td>
+        </tr>
+
+        <!-- Footer letterhead -->
+        <tr>
+          <td align="center" style="padding:20px 24px 8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;line-height:17px;color:#8A8A8A;">
+            Uttarakhand State Sports University &middot; &#2313;&#2340;&#2381;&#2340;&#2352;&#2366;&#2326;&#2339;&#2381;&#2337; &#2352;&#2366;&#2332;&#2381;&#2351; &#2326;&#2375;&#2354; &#2357;&#2367;&#2358;&#2381;&#2357;&#2357;&#2367;&#2342;&#2381;&#2351;&#2366;&#2354;&#2351;<br />
+            Manaskhand Khel Parisar, Gaulapar, Haldwani, Nainital &ndash; 263139<br />
+            <a href="mailto:admissions@ukssu.ac.in" style="color:#8A8A8A;text-decoration:none;">admissions@ukssu.ac.in</a> &middot;
+            <a href="https://ukssu.ac.in" style="color:#8A8A8A;text-decoration:none;">ukssu.ac.in</a>
+          </td>
+        </tr>
+
+      </table>
+
+    </td>
+  </tr>
+</table>

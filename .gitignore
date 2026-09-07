@@ -9,3 +9,5 @@ ruvector.db
 
 .claude/
 .claude-flow/
+
+prisma/.fee-notice-log.json
