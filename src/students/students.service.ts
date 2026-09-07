@@ -47,7 +47,29 @@ export class StudentsService {
   // who merely paid but hasn't been approved yet. Paginated server-side —
   // this used to fetch every match, unbounded, on every page load.
   async findAll(query: PaginatedListQueryDto): Promise<PaginatedResult<unknown>> {
-    const where: Prisma.StudentWhereInput = { user: { ukssuId: { not: null } } };
+    // Same course/gender/discipline/search filters as the Admissions Queue
+    // and Registrations lists — see AdmissionsService.findAll.
+    const where: Prisma.StudentWhereInput = {
+      user: { ukssuId: { not: null } },
+      ...(query.course ? { programme: query.course } : {}),
+      ...(query.gender || query.discipline
+        ? {
+            admission: {
+              ...(query.gender ? { gender: query.gender } : {}),
+              ...(query.discipline ? { coachingDiscipline: query.discipline } : {}),
+            },
+          }
+        : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { rollNumber: { contains: query.search, mode: "insensitive" } },
+              { user: { fullName: { contains: query.search, mode: "insensitive" } } },
+              { user: { email: { contains: query.search, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
+    };
 
     const feeStructures = await this.prisma.feeStructure.findMany({
       select: { id: true, courseId: true, requiresHostelOptIn: true },
