@@ -44,9 +44,22 @@ export class FeesService {
   // Per-line-item breakdown, used by the Fee Receipt page.
   async getMine(userId: string) {
     const student = await this.students.findByUserId(userId);
-    if (!student.courseId) return [];
+    return this.getForStudent(student.id, student.courseId);
+  }
 
-    const rows = await this.getApplicableStructures(student.id, student.courseId);
+  // Same breakdown keyed by studentId — used by the staff student-detail view
+  // (GET /fees/student/:id). courseId is passed in when the caller already
+  // loaded the student to avoid a second lookup.
+  async getForStudent(studentId: string, courseId?: string | null) {
+    let resolvedCourseId = courseId;
+    if (resolvedCourseId === undefined) {
+      const student = await this.prisma.student.findUnique({ where: { id: studentId }, select: { courseId: true } });
+      if (!student) throw new NotFoundException("Student not found");
+      resolvedCourseId = student.courseId;
+    }
+    if (!resolvedCourseId) return [];
+
+    const rows = await this.getApplicableStructures(studentId, resolvedCourseId);
     return rows.map(({ structure: s, payment, opted }) => ({
       id: s.id,
       label: s.label,

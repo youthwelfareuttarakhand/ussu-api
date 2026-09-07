@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { Role } from "@prisma/client";
 import { Roles } from "../common/decorators/roles.decorator";
 import { RolesGuard } from "../common/guards/roles.guard";
@@ -16,6 +16,13 @@ export class FeesController {
   @Roles(Role.STUDENT)
   findMine(@CurrentUser() user: AuthUser) {
     return this.fees.getMine(user.sub);
+  }
+
+  // Staff student-detail view — same breakdown, keyed by studentId.
+  @Get("student/:studentId")
+  @Roles(Role.STAFF, Role.ADMIN)
+  findForStudent(@Param("studentId") studentId: string) {
+    return this.fees.getForStudent(studentId);
   }
 
   @Post("pay")
