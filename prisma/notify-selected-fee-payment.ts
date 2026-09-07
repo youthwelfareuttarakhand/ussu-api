@@ -2,8 +2,9 @@
 // their first-cycle course fee, telling them their admission is confirmed and
 // to pay the semester/annual fee on the portal by the deadline.
 //
-// Uses the Resend dashboard template "fee-payment-selected" (source of truth:
-// emails/fee-payment-selected.html — must be uploaded AND published first).
+// Uses the Resend dashboard template aliased "admission-confirmation" (source
+// of truth: emails/fee-payment-selected.html — must be uploaded AND published
+// first).
 //
 // Run with:
 //   npx ts-node prisma/notify-selected-fee-payment.ts               # dry run (prints table, sends nothing)
@@ -25,7 +26,7 @@ const prisma = new PrismaClient();
 
 const FROM = "USSU Admissions <admissions@ukssu.ac.in>"; // ponytail: mirrors config mail.fromAddress
 const SUBJECT = "Admission confirmed — pay your course fee on the USSU portal by 11 September 2026";
-const TEMPLATE_ID = "fee-payment-selected";
+const TEMPLATE_ID = "admission-confirmation"; // Resend template alias (source: emails/fee-payment-selected.html)
 const PORTAL_URL = "https://portal.ukssu.ac.in";
 const CTA_URL = "https://portal.ukssu.ac.in/login";
 const DUE_DATE = "11 September 2026";
