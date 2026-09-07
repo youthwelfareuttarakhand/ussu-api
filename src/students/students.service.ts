@@ -4,6 +4,8 @@ import type { Prisma } from "@prisma/client";
 import type { PaginatedListQueryDto, PaginatedResult } from "../common/dto/paginated-list-query.dto";
 import type { UpdateStudentDto } from "./dto/update-student.dto";
 
+type FeeStructuresByCourse = Map<string, { id: string; label: string; amountPaise: number; requiresHostelOptIn: boolean }[]>;
+
 @Injectable()
 export class StudentsService {
   constructor(private prisma: PrismaService) {}
@@ -28,7 +30,7 @@ export class StudentsService {
     courseId: string | null,
     hostelRequired: boolean | null,
     payments: { feeStructureId: string; paid: boolean }[],
-    structuresByCourse: Map<string, { id: string; requiresHostelOptIn: boolean }[]>,
+    structuresByCourse: FeeStructuresByCourse,
   ): "PAID" | "PARTIAL" | "UNPAID" | "NA" {
     if (!courseId) return "NA";
     const structures = structuresByCourse.get(courseId) ?? [];
@@ -40,6 +42,32 @@ export class StudentsService {
     if (paidCount === applicable.length) return "PAID";
     if (paidCount === 0) return "UNPAID";
     return "PARTIAL";
+  }
+
+  // Rupee amounts for the Students Excel export: total applicable fee, how
+  // much of it is paid, what's still due, plus the tuition/hostel split.
+  // Same "applicable" rule as deriveFeeStatus (hostel counts only if opted).
+  private deriveFeeAmounts(
+    courseId: string | null,
+    hostelRequired: boolean | null,
+    payments: { feeStructureId: string; paid: boolean }[],
+    structuresByCourse: FeeStructuresByCourse,
+  ) {
+    const structures = courseId ? (structuresByCourse.get(courseId) ?? []) : [];
+    const applicable = structures.filter((s) => !s.requiresHostelOptIn || hostelRequired);
+    const paidIds = new Set(payments.filter((p) => p.paid).map((p) => p.feeStructureId));
+
+    let totalPaise = 0;
+    let paidPaise = 0;
+    let tuitionPaise = 0;
+    let hostelPaise = 0;
+    for (const s of applicable) {
+      totalPaise += s.amountPaise;
+      if (paidIds.has(s.id)) paidPaise += s.amountPaise;
+      if (s.requiresHostelOptIn) hostelPaise += s.amountPaise;
+      else tuitionPaise += s.amountPaise;
+    }
+    return { totalPaise, paidPaise, duePaise: totalPaise - paidPaise, tuitionPaise, hostelPaise };
   }
 
   // Only students with an assigned UKSSU ID show up here — matches the
@@ -72,9 +100,9 @@ export class StudentsService {
     };
 
     const feeStructures = await this.prisma.feeStructure.findMany({
-      select: { id: true, courseId: true, requiresHostelOptIn: true },
+      select: { id: true, courseId: true, label: true, amountPaise: true, requiresHostelOptIn: true },
     });
-    const structuresByCourse = new Map<string, { id: string; requiresHostelOptIn: boolean }[]>();
+    const structuresByCourse: FeeStructuresByCourse = new Map();
     for (const s of feeStructures) {
       structuresByCourse.set(s.courseId, [...(structuresByCourse.get(s.courseId) ?? []), s]);
     }
@@ -118,6 +146,7 @@ export class StudentsService {
     const decorated = data.map((student) => ({
       ...student,
       feeStatus: this.deriveFeeStatus(student.courseId, student.admission?.hostelRequired ?? null, student.feePayments, structuresByCourse),
+      feeAmounts: this.deriveFeeAmounts(student.courseId, student.admission?.hostelRequired ?? null, student.feePayments, structuresByCourse),
     }));
 
     return { data: decorated, total };
