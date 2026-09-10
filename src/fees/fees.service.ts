@@ -35,7 +35,12 @@ export class FeesService {
     ]);
 
     return structures.map((s) => {
-      const payment = s.payments.find((p) => p.cycleLabel === firstCycleLabel(s.cadence));
+      // Fall back to any paid row: a fee paid before its cadence changed
+      // (e.g. the Diploma tuition billed as "Year 1" before it went
+      // semester-wise) keeps counting as paid and is never re-charged.
+      const payment =
+        s.payments.find((p) => p.cycleLabel === firstCycleLabel(s.cadence)) ??
+        s.payments.find((p) => p.paid);
       const opted = s.requiresHostelOptIn ? Boolean(admission?.hostelRequired) : true;
       return { structure: s, payment, opted };
     });
@@ -64,7 +69,7 @@ export class FeesService {
       id: s.id,
       label: s.label,
       cadence: s.cadence,
-      cycleLabel: firstCycleLabel(s.cadence),
+      cycleLabel: payment?.cycleLabel ?? firstCycleLabel(s.cadence),
       amountPaise: opted ? s.amountPaise : 0,
       mandatory: s.requiresHostelOptIn ? opted : s.mandatory,
       status: payment?.paid ? ("PAID" as const) : ("UNPAID" as const),

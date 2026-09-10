@@ -116,8 +116,8 @@ async function main() {
     ),
   );
 
-  // Official prospectus rates, 2026-27: UG courses are billed per semester,
-  // the Diploma per year.
+  // Official prospectus rates, 2026-27: tuition is billed per semester for
+  // every course; only the Diploma hostel fee is billed per year.
   const feeStructuresByCourse: Record<string, { label: string; cadence: "YEAR" | "SEMESTER"; amountPaise: number; mandatory: boolean; requiresHostelOptIn: boolean }[]> = {
     "Bachelor of Sports Science": [
       { label: "Tuition Fee", cadence: "SEMESTER", amountPaise: 2870000, mandatory: true, requiresHostelOptIn: false },
@@ -132,7 +132,7 @@ async function main() {
       { label: "Hostel Fee", cadence: "SEMESTER", amountPaise: 550000, mandatory: false, requiresHostelOptIn: true },
     ],
     "Diploma in Sports Coaching": [
-      { label: "Tuition Fee", cadence: "YEAR", amountPaise: 4510000, mandatory: true, requiresHostelOptIn: false },
+      { label: "Tuition Fee", cadence: "SEMESTER", amountPaise: 2700000, mandatory: true, requiresHostelOptIn: false },
       { label: "Hostel Fee", cadence: "YEAR", amountPaise: 1400000, mandatory: false, requiresHostelOptIn: true },
     ],
   };
