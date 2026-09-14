@@ -143,14 +143,24 @@ export class AdmissionsService {
       if (!admission.paid) {
         throw new BadRequestException("Cannot approve an admission that hasn't paid the admission fee");
       }
-      return this.prisma.$transaction(async (tx) => {
-        let ukssuId = admission.student.user.ukssuId;
+      let ukssuId = admission.student.user.ukssuId;
+      const updated = await this.prisma.$transaction(async (tx) => {
         if (!ukssuId) {
           ukssuId = await this.ukssu.nextId(tx, Role.STUDENT);
           await tx.user.update({ where: { id: admission.student.userId }, data: { ukssuId } });
         }
         return tx.admission.update({ where: { id }, data: { status, reviewedAt: new Date(), reviewedBy } });
       });
+
+      // Fire-and-forget: a mail failure must never block/roll back the approval.
+      void this.mail.sendAdmissionApproved({
+        to: admission.student.user.email,
+        fullName: admission.student.user.fullName,
+        ukssuId: ukssuId!,
+        programme: admission.student.programme,
+      });
+
+      return updated;
     }
 
     return this.prisma.admission.update({

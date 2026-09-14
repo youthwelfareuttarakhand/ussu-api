@@ -10,6 +10,13 @@ interface AdmissionPaymentConfirmedParams {
   paymentId: string;
 }
 
+interface AdmissionApprovedParams {
+  to: string;
+  fullName: string;
+  ukssuId: string;
+  programme: string | null;
+}
+
 interface ContactNotificationParams {
   name: string;
   email: string;
@@ -82,6 +89,38 @@ export class MailService {
       }
     } catch (err) {
       this.logger.error(`Failed to send payment confirmation email to ${params.to}`, err instanceof Error ? err.stack : String(err));
+    }
+  }
+
+  // Fire-and-forget, same as above — the approval is already committed by
+  // the time this runs. Plain HTML (not Resend's Template API), same reason
+  // as sendContactNotification: no dashboard template to set up first.
+  async sendAdmissionApproved(params: AdmissionApprovedParams) {
+    if (!this.client) {
+      this.logger.warn(`RESEND_API_KEY not set — skipping admission approved email to ${params.to}`);
+      return;
+    }
+
+    const html = `
+      <p>Dear ${escapeHtml(params.fullName)},</p>
+      <p>Congratulations! Your admission to <strong>${escapeHtml(params.programme ?? "Uttarakhand State Sports University")}</strong> at Uttarakhand State Sports University has been confirmed.</p>
+      <p><strong>Your UKSSU ID:</strong> ${escapeHtml(params.ukssuId)}</p>
+      <p>You can now log in to the student portal using this ID to view your fee details and complete any remaining payments.</p>
+      <p>Regards,<br />Uttarakhand State Sports University</p>
+    `;
+
+    try {
+      const result = await this.client.emails.send({
+        from: this.from,
+        to: params.to,
+        subject: "Admission Confirmed — Uttarakhand State Sports University",
+        html,
+      });
+      if (result.error) {
+        this.logger.error(`Resend rejected admission approved email to ${params.to}: ${JSON.stringify(result.error)}`);
+      }
+    } catch (err) {
+      this.logger.error(`Failed to send admission approved email to ${params.to}`, err instanceof Error ? err.stack : String(err));
     }
   }
 
